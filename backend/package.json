@@ -1,0 +1,20 @@
+{
+  "name": "freshcart-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Freshcart Express API",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "lint": "eslint src/",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "eslint": "^10.7.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.5",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
+  }
+}

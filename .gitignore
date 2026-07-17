@@ -1,0 +1,5 @@
+# Gitignore rules
+node_modules
+.env
+*.md
+*.pdf
