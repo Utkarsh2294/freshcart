@@ -1,1 +1,78 @@
-# Phase 1: Docker Compose development configuration
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: freshcart-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: freshcart
+      POSTGRES_PASSWORD: freshcart_pass
+      POSTGRES_DB: freshcart
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U freshcart']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: freshcart-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: freshcart-api
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://freshcart:freshcart_pass@postgres:5432/freshcart
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-me
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-me
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/backend/src
+      - ./shared:/app/shared
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: freshcart-web
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_URL: http://localhost:4000/api
+      VITE_SOCKET_URL: http://localhost:4000
+    volumes:
+      - ./frontend/src:/app/frontend/src
+
+volumes:
+  pgdata:
+  redisdata:

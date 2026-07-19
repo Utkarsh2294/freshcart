@@ -1,0 +1,13 @@
+{
+  "name": "freshcart-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Migration runner and seed scripts",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "pg": "^8.16.0",
+    "dotenv": "^16.5.0",
+    "freshcart-shared": "*"
+  }
+}

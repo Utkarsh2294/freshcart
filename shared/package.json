@@ -2,6 +2,22 @@
   "name": "freshcart-shared",
   "version": "1.0.0",
   "type": "module",
-  "description": "Shared constants, schemas, and utilities",
-  "main": "index.js"
+  "description": "Shared constants, schemas, and utilities for Freshcart",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./money": "./money.js",
+    "./constants": "./constants.js",
+    "./schemas/*": "./schemas/*.js",
+    "./enums/*": "./enums/*.js"
+  },
+  "dependencies": {
+    "joi": "^17.13.3"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
 }

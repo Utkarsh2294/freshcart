@@ -1,1 +1,7 @@
-// Phase 0: Validation utility functions
+export const isValidPhone = (phone) => {
+  return /^[6-9]\d{9}$/.test(phone);
+};
+
+export const isValidEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};

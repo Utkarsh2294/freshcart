@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: freshcart
+          POSTGRES_PASSWORD: freshcart_pass
+          POSTGRES_DB: freshcart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://freshcart:freshcart_pass@localhost:5432/freshcart
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-secret
+      JWT_REFRESH_SECRET: ci-test-refresh-secret
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify no TypeScript files
+        run: |
+          count=$(find . -path ./node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print | wc -l)
+          if [ "$count" -gt 0 ]; then
+            echo "ERROR: Found .ts/.tsx files!"
+            find . -path ./node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print
+            exit 1
+          fi
+
+      - name: Run migrations
+        run: node scripts/migrate.js
+
+      - name: Seed database
+        run: node scripts/seed.js
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

@@ -1,1 +1,6 @@
-// Phase 1: Nodemon configuration
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": ["src/**/*.test.js"],
+  "exec": "node src/server.js"
+}

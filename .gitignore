@@ -1,5 +1,24 @@
-# Gitignore rules
+# Dependencies
 node_modules
+dist
 .env
-*.md
-*.pdf
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Coverage
+coverage
+
+# Build artifacts
+*.tgz
+
+# OS
+.DS_Store
+Thumbs.db
