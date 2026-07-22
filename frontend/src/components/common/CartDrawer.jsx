@@ -1,13 +1,48 @@
 import { Link } from 'react-router';
-import { Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { Minus, Plus, RefreshCw, ShoppingBag, Trash2 } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
+import { useUiStore } from '../../store/uiStore';
 import { formatCurrency } from '../../utils/formatters';
 import { getProductImage } from '../../utils/productImages';
+import SwapSheet from './SwapSheet';
+import { useState } from 'react';
 
 export default function CartDrawer({ isOpen, onClose, isDesktop }) {
-  const { items, removeItem, updateItem } = useCartStore();
+  const { items, removeItem, updateItem, getSwapOptions, swapItem, fetchCart } = useCartStore();
+  const { addToast } = useUiStore();
+  const [swapState, setSwapState] = useState({
+    isOpen: false,
+    item: null,
+    options: [],
+    isLoading: false,
+    isSwapping: false,
+    error: '',
+  });
 
   if (!isOpen) return null;
+
+  const openSwap = async (item) => {
+    setSwapState({ isOpen: true, item, options: [], isLoading: true, isSwapping: false, error: '' });
+    try {
+      const data = await getSwapOptions(item._id);
+      setSwapState({ isOpen: true, item, options: data.options || [], isLoading: false, isSwapping: false, error: '' });
+    } catch (err) {
+      setSwapState({ isOpen: true, item, options: [], isLoading: false, isSwapping: false, error: err.response?.data?.error || 'Could not load swap options.' });
+    }
+  };
+
+  const handleSwap = async (option) => {
+    setSwapState(state => ({ ...state, isSwapping: true }));
+    try {
+      await swapItem(swapState.item._id, option.id);
+      addToast({ type: 'success', message: `Swapped to ${option.name}` });
+      setSwapState({ isOpen: false, item: null, options: [], isLoading: false, isSwapping: false, error: '' });
+    } catch (err) {
+      await fetchCart();
+      addToast({ type: 'error', message: err.response?.data?.error || 'Swap failed. Cart restored.' });
+      setSwapState(state => ({ ...state, isSwapping: false }));
+    }
+  };
 
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
   const itemTotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -49,10 +84,18 @@ export default function CartDrawer({ isOpen, onClose, isDesktop }) {
                       <h3 className="line-clamp-1 text-sm font-semibold tracking-normal text-[var(--text-primary)]">{item.product.name}</h3>
                       <p className="text-xs text-[var(--text-secondary)]">{item.product.unit}</p>
                     </div>
-                    <button onClick={() => removeItem(item._id)} className="text-[var(--text-secondary)] hover:text-red-500" title="Remove item">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex gap-1">
+                      <button onClick={() => openSwap(item)} className="text-[var(--text-secondary)] hover:text-[#14B8A6]" title="Swap brand">
+                        <RefreshCw className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => removeItem(item._id)} className="text-[var(--text-secondary)] hover:text-red-500" title="Remove item">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
+                  {item.source === 'ai_recipe' && (
+                    <p className="mt-1 text-xs font-semibold text-[#14B8A6]">From your recipe</p>
+                  )}
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-sm font-bold text-[var(--text-primary)]">{formatCurrency(item.price)}</span>
                     <div className="grid grid-cols-[24px_24px_24px] items-center rounded-md border border-[var(--border-default)] bg-[var(--bg-card)]">
@@ -99,6 +142,16 @@ export default function CartDrawer({ isOpen, onClose, isDesktop }) {
           </div>
         )}
       </div>
+      <SwapSheet
+        isOpen={swapState.isOpen}
+        currentItem={swapState.item}
+        options={swapState.options}
+        isLoading={swapState.isLoading}
+        isSwapping={swapState.isSwapping}
+        error={swapState.error}
+        onClose={() => setSwapState(state => ({ ...state, isOpen: false }))}
+        onSelect={handleSwap}
+      />
     </>
   );
 }

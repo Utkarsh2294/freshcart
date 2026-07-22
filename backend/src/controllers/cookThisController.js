@@ -16,6 +16,13 @@ import Joi from 'joi';
 import { generateRecipe, RecipeGenerationError } from '../services/kimiRecipeClient.js';
 import { pool } from '../config/database.js';
 import { matchIngredientsToProducts } from '../services/ingredientMatcherService.js';
+import { featureFlags } from '../config/featureFlags.js';
+import {
+  computeNutritionAndCost,
+  fetchCatalogProducts as fetchPhase8CatalogProducts,
+  filterMatchesWithPantry,
+  getUserDietaryTags,
+} from '../services/phase8Services.js';
 
 const requestSchema = Joi.object({
   dish_name: Joi.string().trim().min(1).max(200).required(),
@@ -44,7 +51,7 @@ function normalizeDishName(name) {
 
 async function findCachedRecipe(dishName, servings) {
   const { rows } = await pool.query(
-    `SELECT title, steps, ingredients
+    `SELECT title, steps, ingredients, nutrition, estimated_cost
        FROM recipe_cache
       WHERE dish_name = $1 AND servings = $2
       LIMIT 1`,
@@ -88,6 +95,7 @@ async function generateRecipeHandler(req, res) {
         title: cached.title,
         steps: cached.steps,
         ingredients: cached.ingredients,
+        nutrition: cached.nutrition || null,
         source: 'cache',
       });
     }
@@ -150,9 +158,25 @@ async function matchIngredientsHandler(req, res, next) {
   }
 
   try {
-    const products = await fetchCatalogProducts();
+    const dietaryTags = featureFlags.dietaryFilters && req.user?.id
+      ? await getUserDietaryTags(req.user.id)
+      : [];
+    const products = dietaryTags.length
+      ? await fetchPhase8CatalogProducts({ dietaryTags })
+      : await fetchCatalogProducts();
     const matches = matchIngredientsToProducts(value.ingredients, products);
-    return res.json({ matches });
+    const pantryResult = featureFlags.smartPantry && req.user?.id
+      ? await filterMatchesWithPantry(req.user.id, matches)
+      : { matches, pantry_note: '', skipped: [] };
+    const nutrition = featureFlags.nutritionCostCard
+      ? await computeNutritionAndCost(value.ingredients, pantryResult.matches, Number(req.body.servings || 1))
+      : null;
+
+    return res.json({
+      ...pantryResult,
+      nutrition,
+      dietary_tags_applied: dietaryTags,
+    });
   } catch (err) {
     return next(err);
   }
@@ -189,6 +213,25 @@ async function addMatchedItemsHandler(req, res, next) {
           [cartId, item.product_id, item.quantity, 'ai_recipe']
         );
       }
+    }
+
+    if (featureFlags.socialProofGamification) {
+      await pool.query(`
+        INSERT INTO ai_recipe_activity (user_id, activity_date, recipes_generated)
+        VALUES ($1, CURRENT_DATE, 1)
+        ON CONFLICT (user_id, activity_date)
+        DO UPDATE SET recipes_generated = ai_recipe_activity.recipes_generated + 1
+      `, [userId]);
+
+      await pool.query(`
+        INSERT INTO badges (user_id, badge_key, label)
+        SELECT $1, 'ai_recipe_3_day', '3-day AI recipe streak'
+        WHERE (
+          SELECT COUNT(*) FROM ai_recipe_activity
+          WHERE user_id = $1 AND activity_date >= CURRENT_DATE - INTERVAL '2 days'
+        ) >= 3
+        ON CONFLICT DO NOTHING
+      `, [userId]);
     }
 
     return res.json({ success: true, added: value.items.length });

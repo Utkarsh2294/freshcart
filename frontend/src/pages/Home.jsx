@@ -3,11 +3,16 @@ import { ArrowRight, Gift, ShoppingBag } from 'lucide-react';
 import CategoryChips from '../components/common/CategoryChips';
 import InstallBanner from '../components/common/InstallBanner';
 import ProductCard from '../components/common/ProductCard';
+import PramarshaBanner from '../components/common/PramarshaBanner';
 import SkeletonLoader from '../components/common/SkeletonLoader';
 import * as categoryService from '../services/categoryService';
+import * as homeService from '../services/homeService';
+import * as phase8Service from '../services/phase8Service';
 import { useCartStore } from '../store/cartStore';
 import { useProducts } from '../hooks/useProducts';
 import { useAuth } from '../hooks/useAuth';
+import { useUiStore } from '../store/uiStore';
+import { featureFlags } from '../utils/featureFlags';
 
 const fallbackCategories = [
   { name: 'Fruits & Vegetables' },
@@ -21,16 +26,58 @@ const fallbackCategories = [
 
 export default function Home() {
   const { products, isLoading, fetchProducts } = useProducts();
-  const { fetchCart } = useCartStore();
+  const { fetchCart, addItem } = useCartStore();
   const { isAuthenticated } = useAuth();
+  const { addToast } = useUiStore();
   const [categories, setCategories] = useState(fallbackCategories);
+  const [pramarsha, setPramarsha] = useState(null);
+  const [reorderRail, setReorderRail] = useState([]);
+  const [isAddingPramarsha, setIsAddingPramarsha] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchCart();
+      homeService.getHomeRecommendations()
+        .then(data => setPramarsha(data.recommendations?.[0] || null))
+        .catch(() => setPramarsha(null));
+      if (featureFlags.predictiveReorderFeed) {
+        phase8Service.getPredictiveReorder()
+          .then(data => setReorderRail(data.rail || []))
+          .catch(() => setReorderRail([]));
+      }
+    } else {
+      setPramarsha(null);
+      setReorderRail([]);
     }
     fetchProducts();
   }, [fetchCart, fetchProducts, isAuthenticated]);
+
+  const handleAddPramarsha = async () => {
+    if (!pramarsha?.products?.length) return;
+
+    setIsAddingPramarsha(true);
+    try {
+      for (const product of pramarsha.products) {
+        await addItem(product.id, 1, 'suggestion');
+      }
+      addToast({ type: 'success', message: 'Pramarsha picks added to cart.' });
+    } catch (err) {
+      addToast({ type: 'error', message: 'Could not add all Pramarsha picks.' });
+    } finally {
+      setIsAddingPramarsha(false);
+    }
+  };
+
+  const handleAddReorder = async () => {
+    try {
+      for (const product of reorderRail) {
+        await addItem(product.id, 1, 'predictive_reorder');
+      }
+      addToast({ type: 'success', message: 'Reorder picks added to cart.' });
+    } catch {
+      addToast({ type: 'error', message: 'Could not add reorder picks.' });
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -55,6 +102,34 @@ export default function Home() {
       <section>
         <CategoryChips categories={categories} />
       </section>
+
+      <PramarshaBanner
+        recommendation={pramarsha}
+        isAdding={isAddingPramarsha}
+        onAddAll={handleAddPramarsha}
+      />
+
+      {featureFlags.predictiveReorderFeed && reorderRail.length > 0 && (
+        <section className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold tracking-normal text-[var(--text-primary)]">You might need these</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Based on your order cadence, separate from Pramarsha.</p>
+            </div>
+            <button type="button" onClick={handleAddReorder} className="rounded-xl bg-[#14B8A6] px-4 py-2 text-sm font-bold text-white">
+              Add all
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {reorderRail.map(product => (
+              <div key={product.id} className="min-w-[180px] rounded-xl bg-[var(--bg-surface)] p-3">
+                <p className="line-clamp-2 text-sm font-bold text-[var(--text-primary)]">{product.name}</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">{product.reason}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="relative flex h-[280px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#E0E7FF] to-[#EDE9FE] p-8 dark:from-[#181C26] dark:to-[#252A36] lg:col-span-2">

@@ -55,5 +55,19 @@ export const useCartStore = create((set, get) => ({
     }
   },
 
+  getSwapOptions: async (itemId) => {
+    return cartService.getSwapOptions(itemId);
+  },
+
+  swapItem: async (itemId, newProductId) => {
+    try {
+      await cartService.swapItem(itemId, newProductId);
+      await get().fetchCart();
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  },
+
   clearCart: () => set({ items: [], total: 0 }),
 }));

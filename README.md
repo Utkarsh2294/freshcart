@@ -266,3 +266,20 @@ also fails, `POST /ai/cook-this/generate` returns a 422 with a
 `"couldn't generate that recipe, try rephrasing"` message — never a crash,
 never a silently empty cart. See `contracts/generate-recipe.md` for the
 exact response shapes.
+
+## Phase 8 Differentiator Modules
+
+Each module is independently gated. Backend flags use `FEATURE_*`; frontend flags use `VITE_FEATURE_*`. Set a flag to `false`, `0`, `off`, or `no` to hide/disable that module without affecting the core browse -> AI cook -> cart -> swap -> Pramarsha -> checkout loop.
+
+- Smart Pantry: `FEATURE_SMART_PANTRY` / `VITE_FEATURE_SMART_PANTRY`. Adds `user_pantry` and filters pantry ingredients from matched recipe/planner carts with a skipped-items note.
+- Hands-Free Cooking Mode: `FEATURE_HANDS_FREE_COOKING` / `VITE_FEATURE_HANDS_FREE_COOKING`. Adds a full-screen step view with tap/Next navigation, screen wake lock, and browser read-aloud fallback. The existing `ai-services/tts-service` remains the Kokoro-82M integration point when model assets are mounted.
+- Weekly Meal Planner: `FEATURE_WEEKLY_MEAL_PLANNER` / `VITE_FEATURE_WEEKLY_MEAL_PLANNER`. Builds 5-7 varied recipes, consolidates ingredient quantities, then sends one deduped cart review through the matcher.
+- Nutrition + Cost Card: `FEATURE_NUTRITION_COST_CARD` / `VITE_FEATURE_NUTRITION_COST_CARD`. Seeds `nutrition_lookup`, extends `recipe_cache`, and shows calories/protein/cost per serving.
+- Dietary Filters: `FEATURE_DIETARY_FILTERS` / `VITE_FEATURE_DIETARY_FILTERS`. Stores `user_dietary_profiles` and applies tags to matcher/planner/quick-add catalog selection.
+- Social Proof + Gamification: `FEATURE_SOCIAL_PROOF_GAMIFICATION` / `VITE_FEATURE_SOCIAL_PROOF_GAMIFICATION`. Rolls up `order_events` above the minimum threshold and awards simple AI recipe streak badges.
+- Voice Commerce Quick-Add: `FEATURE_VOICE_QUICK_ADD` / `VITE_FEATURE_VOICE_QUICK_ADD`. Uses the Web Speech API transcript, a deterministic quantity/unit/name parser, matcher-service product matching, and review chips before cart insertion.
+- Push Notifications + PWA: `FEATURE_PUSH_NOTIFICATIONS_PWA` / `VITE_FEATURE_PUSH_NOTIFICATIONS_PWA`. Adds notification preferences, `web-push` VAPID delivery, notification job records, and a test order-status push endpoint.
+- Predictive Reorder Feed: `FEATURE_PREDICTIVE_REORDER_FEED` / `VITE_FEATURE_PREDICTIVE_REORDER_FEED`. Adds a distinct Home rail using purchase cadence on top of the existing user-affinity path, with one-tap add all.
+- Referral + Cashback Wallet: `FEATURE_REFERRAL_WALLET` / `VITE_FEATURE_REFERRAL_WALLET`. Adds native share/copy fallback, wallet transaction history continuity, admin goodwill credit, and exactly-once referral redemption via `referral_redemptions`.
+
+Run `npm run migrate` after pulling Phase 8 so `scripts/migrations/012_phase8_modules.sql` is applied before exercising the new routes.

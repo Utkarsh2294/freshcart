@@ -18,10 +18,13 @@ export const generateRecipe = async (dishName, servings) => {
   return data;
 };
 
-export const matchIngredients = async (ingredients) => {
-  const { data } = await api.post('/ai/cook-this/match', { ingredients });
+export const matchIngredients = async (ingredients, servings = 1) => {
+  const { data } = await api.post('/ai/cook-this/match', { ingredients, servings });
   return {
     matches: (data.matches || []).map(normalizeMatch),
+    pantry_note: data.pantry_note || '',
+    nutrition: data.nutrition || null,
+    dietary_tags_applied: data.dietary_tags_applied || [],
   };
 };
 

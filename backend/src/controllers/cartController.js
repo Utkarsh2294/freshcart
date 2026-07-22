@@ -1,4 +1,5 @@
 import { pool } from '../config/database.js';
+import { multiply, subtract } from 'freshcart-shared/money';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -26,9 +27,23 @@ export const getCart = async (req, res, next) => {
 
     // Get items
     const itemsResult = await pool.query(`
-      SELECT ci.id, ci.product_id, ci.qty AS quantity, p.name, p.price, p.image_url, p.stock_qty 
+      SELECT
+        ci.id,
+        ci.product_id,
+        ci.qty AS quantity,
+        ci.source,
+        p.name,
+        p.price::float AS price,
+        COALESCE(p.mrp, p.price)::float AS mrp,
+        p.unit,
+        p.image_url,
+        p.stock_qty,
+        c.name AS category,
+        b.name AS brand
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN brands b ON b.id = p.brand_id
       WHERE ci.cart_id = $1
       ORDER BY ci.created_at ASC
     `, [cart.id]);
@@ -110,11 +125,27 @@ export const updateItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { quantity } = req.body;
+    const userId = req.user.id;
     
     if (quantity <= 0) {
-      await pool.query("DELETE FROM cart_items WHERE id = $1", [id]);
+      await pool.query(`
+        DELETE FROM cart_items ci
+        USING carts c
+        WHERE ci.id = $1
+          AND ci.cart_id = c.id
+          AND c.user_id = $2
+          AND c.status = 'active'
+      `, [id, userId]);
     } else {
-      await pool.query("UPDATE cart_items SET qty = $1 WHERE id = $2", [quantity, id]);
+      await pool.query(`
+        UPDATE cart_items ci
+        SET qty = $1
+        FROM carts c
+        WHERE ci.id = $2
+          AND ci.cart_id = c.id
+          AND c.user_id = $3
+          AND c.status = 'active'
+      `, [quantity, id, userId]);
     }
     
     res.json({ success: true });
@@ -126,9 +157,187 @@ export const updateItem = async (req, res, next) => {
 export const removeItem = async (req, res, next) => {
   try {
     const { id } = req.params;
-    await pool.query("DELETE FROM cart_items WHERE id = $1", [id]);
+    const userId = req.user.id;
+    await pool.query(`
+      DELETE FROM cart_items ci
+      USING carts c
+      WHERE ci.id = $1
+        AND ci.cart_id = c.id
+        AND c.user_id = $2
+        AND c.status = 'active'
+    `, [id, userId]);
     res.json({ success: true });
   } catch (error) {
     next(error);
+  }
+};
+
+async function getCartItemForUser(client, itemId, userId) {
+  const { rows } = await client.query(`
+    SELECT
+      ci.id,
+      ci.cart_id,
+      ci.product_id,
+      ci.qty,
+      ci.source,
+      p.name,
+      p.category_id,
+      p.price::float AS price,
+      p.stock_qty
+    FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    JOIN products p ON p.id = ci.product_id
+    WHERE ci.id = $1
+      AND c.user_id = $2
+      AND c.status = 'active'
+    LIMIT 1
+  `, [itemId, userId]);
+  return rows[0] || null;
+}
+
+async function resolveSwapCategoryIds(client, categoryId) {
+  const { rows: categoryRows } = await client.query(
+    'SELECT id, parent_id FROM categories WHERE id = $1',
+    [categoryId]
+  );
+  const category = categoryRows[0];
+  if (!category) return [categoryId];
+
+  const { rows: exactRows } = await client.query(
+    'SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1 AND stock_qty > 0',
+    [categoryId]
+  );
+
+  if (exactRows[0].count >= 3 || !category.parent_id) {
+    return [categoryId];
+  }
+
+  const { rows: siblingRows } = await client.query(
+    'SELECT id FROM categories WHERE parent_id = $1',
+    [category.parent_id]
+  );
+  return siblingRows.map(row => row.id);
+}
+
+async function getSwapOptionsForItem(client, item, limit = 4) {
+  const categoryIds = await resolveSwapCategoryIds(client, item.category_id);
+  const { rows } = await client.query(`
+    SELECT
+      p.id AS product_id,
+      p.name,
+      p.price::float AS price,
+      COALESCE(p.mrp, p.price)::float AS mrp,
+      p.unit,
+      p.image_url,
+      p.stock_qty,
+      c.name AS category,
+      b.name AS brand,
+      COALESCE(AVG(r.rating), 4)::float AS rating,
+      COALESCE(ps.final_score, 0.55)::float AS final_score
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
+    LEFT JOIN reviews r ON r.product_id = p.id
+    LEFT JOIN product_scores ps ON ps.product_id = p.id
+    WHERE p.category_id = ANY($1::int[])
+      AND p.id <> $2
+      AND p.stock_qty > 0
+    GROUP BY p.id, c.name, b.name, ps.final_score
+    ORDER BY COALESCE(ps.final_score, 0.55) DESC, rating DESC, p.stock_qty DESC, p.name ASC
+    LIMIT $3
+  `, [categoryIds, item.product_id, limit]);
+
+  return rows.map(row => ({
+    ...row,
+    id: row.product_id,
+    price_delta: subtract(row.price, item.price),
+    line_price_delta: subtract(multiply(row.price, item.qty), multiply(item.price, item.qty)),
+  }));
+}
+
+export const getSwapOptions = async (req, res, next) => {
+  const start = Date.now();
+  const client = await pool.connect();
+  try {
+    const item = await getCartItemForUser(client, req.params.id, req.user.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Cart item not found' });
+    }
+
+    const options = await getSwapOptionsForItem(client, item);
+    return res.json({
+      item: {
+        id: item.id,
+        product_id: item.product_id,
+        name: item.name,
+        price: item.price,
+        quantity: item.qty,
+        source: item.source,
+      },
+      options,
+      latency_ms: Date.now() - start,
+      ranking_source: 'product_scores_with_sql_fallback',
+    });
+  } catch (error) {
+    next(error);
+  } finally {
+    client.release();
+  }
+};
+
+export const swapItem = async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const item = await getCartItemForUser(client, req.params.id, req.user.id);
+    if (!item) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cart item not found' });
+    }
+
+    const { new_product_id } = req.body;
+    if (String(new_product_id) === String(item.product_id)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Choose a different product to swap' });
+    }
+
+    const options = await getSwapOptionsForItem(client, item, 12);
+    const selected = options.find(option => String(option.product_id) === String(new_product_id));
+    if (!selected) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Selected product is not a valid in-stock swap option' });
+    }
+
+    const existing = await client.query(
+      'SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+      [item.cart_id, new_product_id]
+    );
+
+    if (existing.rows.length) {
+      await client.query(
+        'UPDATE cart_items SET qty = qty + $1, source = $2 WHERE id = $3',
+        [item.qty, item.source, existing.rows[0].id]
+      );
+      await client.query('DELETE FROM cart_items WHERE id = $1', [item.id]);
+    } else {
+      await client.query(
+        'UPDATE cart_items SET product_id = $1, source = $2 WHERE id = $3',
+        [new_product_id, item.source, item.id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return res.json({
+      success: true,
+      item_id: existing.rows[0]?.id || item.id,
+      product: selected,
+      preserved_source: item.source,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
   }
 };

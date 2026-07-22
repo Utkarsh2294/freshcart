@@ -9,3 +9,7 @@ export const cartItemAddSchema = Joi.object({
 export const cartItemUpdateSchema = Joi.object({
   quantity: Joi.number().integer().min(0).max(50).required(),
 });
+
+export const cartItemSwapSchema = Joi.object({
+  new_product_id: Joi.number().integer().positive().required(),
+});

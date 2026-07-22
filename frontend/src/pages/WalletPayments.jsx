@@ -6,6 +6,7 @@ import Input from '../components/common/Input';
 import Badge from '../components/common/Badge';
 import { Wallet, Copy, Share2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useUiStore } from '../store/uiStore';
+import { featureFlags } from '../utils/featureFlags';
 
 export default function WalletPayments() {
   const { balance, transactions, referralCode, fetchWallet, fetchReferralCode, redeemCode } = useWalletStore();
@@ -23,6 +24,17 @@ export default function WalletPayments() {
       navigator.clipboard.writeText(referralCode);
       addToast({ type: 'success', message: 'Code copied to clipboard!' });
     }
+  };
+
+  const handleShare = async () => {
+    if (!referralCode) return;
+    const text = `Use my Freshcart referral code ${referralCode} and we both get wallet credit.`;
+    if (navigator.share) {
+      await navigator.share({ title: 'Freshcart referral', text });
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    addToast({ type: 'success', message: 'Referral link copied.' });
   };
 
   const handleRedeem = async (e) => {
@@ -53,7 +65,7 @@ export default function WalletPayments() {
           <h2 className="text-4xl font-bold relative z-10">{formatPrice(balance)}</h2>
         </div>
 
-        <div className="bg-white dark:bg-[#1A1C24] rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800/50">
+        {featureFlags.referralWallet && <div className="bg-white dark:bg-[#1A1C24] rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800/50">
           <h3 className="font-bold mb-4 text-gray-900 dark:text-white">Refer & Earn</h3>
           <p className="text-sm text-gray-500 mb-4">Share this code with friends to earn <span className="text-[#8B5CF6] font-semibold">{formatPrice(50)}</span> wallet cash!</p>
           <div className="flex flex-col gap-3">
@@ -64,14 +76,14 @@ export default function WalletPayments() {
               <button className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center" onClick={handleCopy}>
                 <Copy className="w-4 h-4 mr-2" /> Copy
               </button>
-              <button className="flex-1 py-2 rounded-xl bg-[#8B5CF6] text-white font-medium hover:bg-[#7C3AED] transition-colors flex items-center justify-center">
+              <button onClick={handleShare} className="flex-1 py-2 rounded-xl bg-[#8B5CF6] text-white font-medium hover:bg-[#7C3AED] transition-colors flex items-center justify-center">
                 <Share2 className="w-4 h-4 mr-2" /> Share
               </button>
             </div>
           </div>
-        </div>
+        </div>}
 
-        <div className="bg-white dark:bg-[#1A1C24] rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800/50">
+        {featureFlags.referralWallet && <div className="bg-white dark:bg-[#1A1C24] rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800/50">
           <h3 className="font-bold mb-4 text-gray-900 dark:text-white">Redeem Code</h3>
           <form onSubmit={handleRedeem} className="flex gap-2">
             <input 
@@ -84,7 +96,7 @@ export default function WalletPayments() {
               Redeem
             </button>
           </form>
-        </div>
+        </div>}
       </div>
 
       <div className="md:col-span-2">

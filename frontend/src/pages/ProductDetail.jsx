@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import * as productService from '../services/productService';
 import { useCartStore } from '../store/cartStore';
 import PriceTag from '../components/common/PriceTag';
@@ -7,11 +7,17 @@ import Rating from '../components/common/Rating';
 import StockIndicator from '../components/common/StockIndicator';
 import { Plus, Minus, ShoppingCart } from 'lucide-react';
 import { getProductImage } from '../utils/productImages';
+import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
+import { featureFlags } from '../utils/featureFlags';
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [socialProof, setSocialProof] = useState('');
   
   const { items, addItem, updateItem, removeItem } = useCartStore();
   const cartItem = items.find(item => String(item?.productId) === String(id));
@@ -31,6 +37,13 @@ export default function ProductDetail() {
     fetchProduct();
   }, [id]);
 
+  useEffect(() => {
+    if (!featureFlags.socialProofGamification || !isAuthenticated) return;
+    api.get(`/phase8/social-proof/products/${id}`)
+      .then(({ data }) => setSocialProof(data.message || ''))
+      .catch(() => setSocialProof(''));
+  }, [id, isAuthenticated]);
+
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
   if (!product) return <div className="p-8 text-center text-red-500">Product not found</div>;
 
@@ -45,6 +58,7 @@ export default function ProductDetail() {
           <div>
             <span className="text-sm font-semibold text-[#8B5CF6] uppercase tracking-wider">{product.brand}</span>
             <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2 leading-tight">{product.name}</h1>
+            {socialProof && <p className="mt-3 rounded-full bg-[#ECFDF5] px-3 py-1 text-sm font-bold text-[#047857]">{socialProof}</p>}
             <div className="flex items-center gap-4 mt-4">
               <Rating value={product.rating || 4} />
               <span className="text-sm font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">{product.unit}</span>
@@ -65,17 +79,17 @@ export default function ProductDetail() {
           <div className="pt-6">
             {qty > 0 ? (
               <div className="flex items-center w-full sm:w-48 bg-gray-100 dark:bg-[#0F111A] rounded-2xl h-14 border border-gray-200 dark:border-gray-700 shadow-inner">
-                <button onClick={() => qty === 1 ? removeItem(cartItem._id) : updateItem(cartItem._id, qty - 1)} className="flex-1 flex justify-center text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors h-full items-center">
+                <button onClick={() => isAuthenticated ? (qty === 1 ? removeItem(cartItem._id) : updateItem(cartItem._id, qty - 1)) : navigate('/auth')} className="flex-1 flex justify-center text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors h-full items-center">
                   <Minus className="w-5 h-5" />
                 </button>
                 <span className="px-4 font-bold text-gray-900 dark:text-white text-xl">{qty}</span>
-                <button onClick={() => updateItem(cartItem._id, qty + 1)} className="flex-1 flex justify-center text-[#8B5CF6] hover:text-[#7C3AED] transition-colors h-full items-center">
+                <button onClick={() => isAuthenticated ? updateItem(cartItem._id, qty + 1) : navigate('/auth')} className="flex-1 flex justify-center text-[#8B5CF6] hover:text-[#7C3AED] transition-colors h-full items-center">
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
             ) : (
               <button 
-                onClick={() => addItem(product.id, 1, 'manual')} 
+                onClick={() => isAuthenticated ? addItem(product.id, 1, 'manual') : navigate('/auth')} 
                 className="w-full sm:w-56 py-4 text-base font-bold flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#F97316] text-white hover:opacity-90 transition-opacity shadow-lg shadow-[#EC4899]/20"
                 disabled={!product.inStock}
               >

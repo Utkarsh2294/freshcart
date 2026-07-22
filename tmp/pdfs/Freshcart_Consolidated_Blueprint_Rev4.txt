@@ -1,0 +1,1007 @@
+
+
+--- PAGE 1 ---
+CONSOLIDATED BLUEPRINT · REVISION 4.0
+Freshcart
+Quick-Commerce + AI Recipe-to-Cart,
+Locked Design Edition
+A single, from-zero build plan that supersedes Technical Blueprint Rev
+2.0 and folds in the
+Redesign / Voice Search / Kimi K3 / Pramarsha Addendum Rev 3.0 —
+read once, build from this.
+This document replaces both source files you gave me. Nothing here needs to be
+cross-referenced against the old blueprint or the addendum anymore — every phase
+below already has the changes folded in, and every place something was removed,
+replaced, or added is called out inline so you know exactly what moved and why.
+Prepared Stack AI approach Version
+for React 18 · Node/Express · PostgreSQL · plain JS end-Self-hosted fine-tuned OSS models, one scoped exception 4.0 · July
+Utkarsh to-end (Kimi K3) 2026
+
+
+--- PAGE 2 ---
+SECTION 0
+What Changed in This Revision
+Before the plan itself — a straight diff against Blueprint Rev 2.0, so you can see exactly what carried over untouched, what got replaced,
+and what's brand new. Everything after this section is the single, current source of truth; you don't need to hold the old documents in your
+head anymore.
+Area Status What changed and why
+Visual design (Phase 0) LOCKED Old Phase 0 was open-ended design exploration ("avoid copying any specific brand's
+palette"). That exploration is done — freshcart_redesign_prototype.html is the
+finished answer. Phase 0 in this revision is now a lock-in spec: exact hex tokens, exact
+component anatomy, exact light/dark behavior, taken directly from the reference file and the
+Design Principles doc. Nothing to redesign — only to port into real components.
+Voice search NEW Real voice search on the topbar mic icon, implemented with the browser's native Web
+Speech API — free, client-side, no model hosting. Moved out of the old "later redesign"
+addendum and placed where it belongs: Phase 3, as a first-class core feature.
+Self-hosted Speech-to-Text REMOVED Old Phase 3 fine-tuned Faster-Whisper for voice dish requests. Since voice now runs on
+(Whisper) the free Web Speech API for search, and the Cook-with-AI flow is text-first per the
+reference file's modal, a self-hosted STT service no longer earns its GPU cost. Cut cleanly
+— see Risks & Limitations for the honest trade-off.
+Dish photo recognition (vision REMOVED Old Phase 3 fine-tuned SigLIP/ViT for "photograph your dish." The reference file's Cook-
+model) with-AI modal is dish-name + servings only — no camera step. Descoped for this revision;
+flagged as an optional future phase, not deleted from the roadmap conceptually.
+Recipe generation engine REPLACED Old Phase 4 built a full curated recipe knowledge base, a fine-tuned embedding retrieval
+index, and a QLoRA-tuned Qwen3/Phi-4-mini for adaptation — weeks of ML work. That's
+replaced by a direct Kimi K3 API call ( kimiRecipeClient.js ) behind one function.
+This is the one deliberate, scoped exception to the "no third-party AI API" rule in this whole
+project — everything else stays self-hosted. See Section 2 and Section 9 for the honest
+framing.
+Ingredient matching UNCHANGED Self-hosted RapidFuzz + sentence-transformer matcher from old Phase 5 carries over
+exactly — Kimi K3 only replaces recipe text, never the grounding against your real catalog.
+Quantity-aware pack selection NEW A genuinely new piece of deterministic logic — selectPack() — that decides which
+real pack size(s) to add to cart for a needed quantity (exact match / multi-pack combo /
+oversized-only / no match). This didn't exist in Rev 2.0 at all.
+Pramarsha temporal behavior NEW A personalization engine built in a separate work-stream, already live (event logging,
+engine (external) pattern mining, a recommendation-serving API). Not part of this blueprint's build — this
+revision only adds the Home-surface integration (persistent banner) and scales the catalog/
+synthetic-user seed data so its output looks real in a demo.
+Brand swap feature UNCHANGED Carries over from old Phase 6 as-is, just restyled against the locked Phase 0 tokens.
+Advanced feature layer UPDATED All 10 modules from old Phase 7 carry over; the "voice commerce quick-add" module is
+updated to reuse the same Web Speech API transcript from Phase 3 instead of a self-
+hosted Whisper endpoint.
+Database schema SIMPLIFIED recipes / recipe_ingredients / the FAISS recipe-embedding index are gone —
+replaced by one lightweight recipe_cache table keyed on (dish_name, servings), since
+Kimi K3 does generation live and caching is now about avoiding repeat API calls, not
+powering retrieval.
+Everything else UNCHANGED Core e-commerce (Phase 1), reviews/recommendation engine (Phase 2), the real-SKU
+catalog approach, wallet/referral/PWA/live-tracking, and the testing/deployment discipline
+all carry over from Rev 2.0 essentially as originally written.
+SECTION 1
+Freshcart · Consolidated Blueprint Rev 4.0 · 2
+
+
+--- PAGE 3 ---
+Executive Summary
+Freshcart is a quick-commerce grocery platform — Zepto/Blinkit-style storefront, doorstep delivery, your own catalog only — built around one
+flagship feature: an AI agent that turns a typed (or voice-searched) dish request into a priced, editable, swappable cart pulled entirely from your
+own product database. This revision locks in three things that were still open in earlier drafts:
+• The visual design is finished, not aspirational. Every screen in this plan is built against the exact tokens and component anatomy of
+freshcart_redesign_prototype.html — the same sidebar, topbar, category chips, gradient hero, deals grid, and persistent cart panel
+you already have working as a static mock, in both light and dark mode. Phase 0 below is a porting job, not a design exercise.
+• The AI pipeline has one honest, scoped exception. Every model in this project is still a self-hosted, fine-tuned open-weight model you
+control — except recipe generation, which calls Kimi K3 via API. That's a deliberate trade against reality: Kimi K3 isn't self-hostable by an
+individual (2.8T parameters, no full open weights at time of writing), and a homegrown 4B fine-tune consistently underperforms it on recipe
+quality. One exception, clearly labelled, doesn't compromise the "no AI wrapper" story for the other seven self-hosted components.
+• Pramarsha is a second, independent AI system riding on top. A temporal-behavior recommendation engine — already built, already
+mining real event data — gets its own dedicated, visually distinct Home surface (teal/green gradient, reserved for it alone) rather than being
+folded into the generic recommendation rail.
+What still makes this a strong resume/hackathon project, not a generic clone: the AI layer is a real multi-model pipeline (NLU, retrieval-free
+generation via a frontier model API used surgically, a fine-tuned semantic matcher, a hybrid recommender, and a genuinely novel deterministic
+pack-selection algorithm) sitting on a production-shaped relational core with wallet, referral, live tracking, and PWA installability already solved.
+SECTION 2
+Scope Clarifications & Honest Assumptions
+"Self-trained AI" still means fine-tuning, not training from scratch — for the six components that remain self-hosted (text intent/servings
+NER, ingredient-matching embeddings, review sentiment, recommendation ranking, and optionally cooking-mode TTS), the plan is unchanged
+from Rev 2.0: download open-weight checkpoints, fine-tune on your own curated data, serve from your own FastAPI microservices, zero API
+keys involved.
+On the Kimi K3 exception, specifically. Kimi K3's full weights were not openly released as of this writing, and even once released, a 2.8T-
+parameter model is far beyond single-GPU self-hosting for a student project. Using it via API for recipe generation only is a deliberate, scoped
+exception to the zero-third-party-API principle — not a reversal of it. Every other AI component in this system, including the ingredient matcher that
+grounds Kimi's output against your real catalog, stays self-hosted. Say this plainly in any interview or demo: "one exception, chosen deliberately, for
+the one component where a frontier model earns its keep."
+Compute reality is lighter than Rev 2.0 assumed. Dropping the self-hosted Whisper fine-tune and the QLoRA-tuned recipe LLM removes the
+two heaviest GPU workloads from the original plan. What's left to fine-tune — a small NER model, a sentence-transformer, and a DistilBERT
+sentiment classifier — comfortably fits a free-tier Colab/Kaggle GPU for training and a CPU or single consumer GPU for inference.
+Maps/payments/SMS remain infrastructure, not AI — same reasoning as before: Razorpay/Stripe test mode for payments, MSG91-style
+OTP for auth, and self-hosted OpenStreetMap + Leaflet for the live-tracking map. These don't conflict with the "no AI wrapper" principle because
+they're not AI.
+Plain JavaScript, still, everywhere except the Python AI layer. React + Vite + Tailwind on the frontend, Node/Express (ESM) on the
+backend, no .ts /.tsx file anywhere. The compensations from Rev 2.0 — Joi validation at every API boundary, PropTypes on every
+component, mandatory unit tests on anything touching money — are unchanged and, if anything, more load-bearing now that the design system
+also has zero compile-time enforcement (a color token typo won't be caught by a compiler either — Phase 0 below is written to make that hard
+to get wrong).
+Everything below is scoped for a solo developer (or you + 1-2 teammates) across roughly 24-26 weeks, MVP-first — slightly shorter than Rev
+2.0's 27 weeks, mostly thanks to the two removed ML services.
+SECTION 3
+Recommended Tech Stack
+Layer Choice Why / What changed
+Frontend React 18 + Vite, plain JS (.jsx), PropTypes, Unchanged from Rev 2.0. Tailwind config now imports the locked design-
+Tailwind CSS, Zustand/Redux Toolkit tokens file from Phase 0 directly, rather than starting from Tailwind defaults.
+Freshcart · Consolidated Blueprint Rev 4.0 · 3
+
+
+--- PAGE 4 ---
+Backend API Node.js + Express (ESM), Socket.IO for live Unchanged.
+tracking + notifications
+Primary Database PostgreSQL 16, pg_trgm enabled Unchanged, schema simplified — see Section 6.
+Cache / Queue Redis + BullMQ Unchanged; now also backs the recipe_cache read path and Kimi K3
+rate-limit guarding.
+Recipe generation Kimi K3 via API (OpenRouter moonshotai/ NEW — the one third-party AI dependency in the whole system.
+kimi-k3 or Moonshot's own Isolated behind services/kimiRecipeClient.js so the rest of the
+api.moonshot.ai/v1 ) app never touches the API directly.
+Voice input Browser-native Web Speech API NEW , replaces self-hosted Whisper. Free, zero model hosting, runs
+(SpeechRecognition / entirely client-side; gracefully disabled on unsupported browsers (notably
+webkitSpeechRecognition ) Firefox).
+AI Microservices Python + FastAPI — one service per model Now covers: text-intent NER, ingredient matcher/embeddings, review
+(self-hosted) family sentiment, recommendation ranking, optional cooking-mode TTS. Vision
+and STT services removed.
+Vector / Fuzzy pgvector or FAISS (matcher embeddings only) + Recipe-retrieval FAISS index removed along with the old recipe KB; the
+Search RapidFuzz matcher's embedding index is unaffected.
+Object Storage MinIO (self-hosted, S3-compatible) Unchanged.
+Auth JWT + refresh tokens, OTP via SMS gateway Unchanged.
+Payments & Wallet Razorpay/Stripe test mode, internal wallet ledger, Unchanged.
+BNPL mock
+PWA & Notifications vite-plugin-pwa , Web Push + web-push Unchanged, built from Phase 1 onward (not deferred).
+npm package
+External Pramarsha — behavior-engine-service (pre- NEW to this document — consumed via GET /home/
+personalization existing) recommendations , not rebuilt here.
+DevOps Docker Compose (dev) → Docker + single GPU Lighter GPU footprint than Rev 2.0 — no Whisper, no recipe-LLM serving.
+VM (prod/demo)
+SECTION 4
+System Architecture
+Same separation-of-concerns principle as Rev 2.0: the Node API never talks to any model directly — it calls one internal AI Orchestrator, which
+fans out to specialized FastAPI microservices and, for exactly one hop, to the external Kimi K3 API. That hop is isolated behind a single client
+module so a Kimi outage degrades gracefully (retry once → "couldn't generate that recipe, try rephrasing" state) instead of taking down
+checkout or browsing.
+• Everything self-hosted, except one labelled exception. Model weights for the NER, matcher, sentiment, and recommendation
+components sit in a local cache directory, fine-tuned by you. The only runtime call to any external AI API in the entire system is
+kimiRecipeClient.js → Kimi K3 .
+• Graceful degradation, unchanged principle. If any AI microservice — or Kimi K3 itself — is slow or down, the customer can still browse,
+search, and check out normally.
+• Two independent AI layers now coexist on Home. The Cook-with-AI pipeline (Kimi K3 → matcher → pack selection) and the Pramarsha
+temporal-behavior engine (external, already built) both write to the Home screen but never call into each other — Pramarsha's mining
+pipeline has its own event log and its own serving endpoint, untouched by this blueprint.
+• No compiler, so contracts are written down explicitly. Every service boundary — Node↔FastAPI, Node↔Kimi K3, frontend↔Node — is
+documented in /contracts as an explicit JSON schema. Treat that folder as load-bearing, not optional documentation.
+SECTION 5
+Database Schema (Core Tables)
+Build this in Phase 1, extend (never redesign) it afterward. Changes from Rev 2.0 are flagged inline.
+Freshcart · Consolidated Blueprint Rev 4.0 · 4
+
+
+--- PAGE 5 ---
+Table Key Columns Notes
+users id, phone UNIQUE, email, password_hash, name, OTP-based login
+created_at
+addresses id, user_id FK, label, lat, lng, full_address, is_default Drives dark-store assignment
+categories id, name, parent_id FK, icon_url Self-referencing for subcategories
+brands id, name, logo_url Needed for swap feature
+products id, name, category_id FK, brand_id FK, price, unit, CHANGED — added pack_size_value (numeric,
+pack_size_value, stock_qty, image_url, attributes JSONB, normalized to g/ml) so Phase 5's selectPack() can
+dietary_tags TEXT[], search_vector TSVECTOR compare pack sizes directly instead of parsing the unit string
+at query time.
+reviews id, product_id FK, user_id FK, rating 1-5, review_text, sentiment_score filled by Phase 2's fine-tuned model
+sentiment_score, created_at
+product_scores product_id, weighted_rating, sentiment_avg, Precomputed nightly; read by matcher, swap, and
+sales_velocity, final_score Pramarsha's cohort scoring alike
+carts / cart_items cart_id, user_id, status; product_id, qty, source Unchanged
+('manual'/'ai_recipe')
+orders / order_items standard header + line items, status enum, delivery ETA Unchanged
+recipes / — REMOVED — the curated recipe KB and its FAISS
+recipe_ingredients embedding index are gone. Kimi K3 generates recipes live;
+there is no retrieval step left to power.
+recipe_cache id, dish_name, servings, title, steps JSONB, ingredients NEW — replaces the old recipe tables. Keyed on
+JSONB, source ('kimi_api'), created_at (normalized dish_name, servings); a repeat request never re-
+calls Kimi K3.
+ingredient_product_map ingredient_name, dark_store_id, product_id, match_type CHANGED — now dark-store-scoped and carries the
+('exact'/'closest'/'oversized'), qty, note, confidence_score, pack-selection match_type /note fields from Phase 5's
+is_manual_override new selectPack() logic.
+ai_interaction_logs id, user_id, input_type ('text'/'voice'), raw_input_ref, CHANGED — input_type drops 'image'; FK now
+extracted_dish, servings, recipe_cache_id FK, created_at points at recipe_cache instead of the removed
+recipes table.
+dark_stores id, name, lat, lng, service_radius_km, is_active Unchanged
+wallet_transactions id, user_id, type, amount, related_order_id, created_at Unchanged
+referral_codes id, user_id UNIQUE, code UNIQUE, times_used, Unchanged
+created_at
+push_subscriptions id, user_id, endpoint, keys JSONB, created_at Unchanged
+user_pantry user_id, ingredient_name, added_at Introduced in Phase 8 (Smart Pantry module)
+Pramarsha's own tables event log, cohort_time_patterns, personal_rules, etc. EXTERNAL — already exist in Pramarsha's own service;
+not created or modified by this blueprint. Constraint carried
+into Phase 7: never touch this schema.
+Freshcart · Consolidated Blueprint Rev 4.0 · 5
+
+
+--- PAGE 6 ---
+SECTION 6
+Design System — Locked Visual Spec
+This is the literal, final answer to "what should Freshcart look like." It supersedes every prior design instruction. Source of truth:
+freshcart_redesign_prototype.html (both light and dark mode) plus the accompanying Design Principles notes. Phase 0 below ports
+this into real components — nothing in this section is up for reinterpretation.
+6.1 — Color Tokens
+Light mode uses layered whites for depth without heavy borders; dark mode is a true near-black, not an inverted light theme — cards get a distinct
+elevated surface color rather than a lighter shade of the page background.
+Background Secondary bg Card Text primary Text secondary Border
+#F7F8FA #FBFBFC #FFFFFF #111111 #6B7280 #ECEEF2
+Dark bg Dark surface Dark elevated card Dark border Dark text sec.
+#08090C #111827 #181C26 #252A36 #A3A3A3
+Primary gradient Accent gradient Primary CTA Pramarsha-only
+#6366F1→#8B5CF6 #8B5CF6→#EC4899→#F97#3613666F1→#F97316 gradient
+teal→green
+Success Warning Error Info
+#22C55E #F59E0B #EF4444 #3B82F6
+The teal→green gradient is reserved exclusively for Pramarsha surfaces — never reused for a generic promo banner. That's the one rule most
+likely to get silently violated by a coding agent unless it's called out explicitly, so Phase 0's master prompt repeats it.
+6.2 — Typography, Icons, Layout
+Aspect Spec
+Font family Geist (preferred) → Inter (fallback) → SF Pro Display
+Scale Hero 48px · Page heading 32px · Section heading 24px · Card title 18px · Body 16px · Small 14px · Caption 12px —
+Medium/SemiBold weights only
+Icons Lucide / Phosphor / Heroicons, 2px rounded stroke, consistent across sidebar, topbar, category chips, and cart
+Layout Desktop max-width 1440px · horizontal padding 48px (64px on large desktop) · section spacing 40-56px · card gap
+24px · generous whitespace throughout
+Motion 200-300ms transitions on buttons, cards, search, cart, drawers, notifications, add-to-cart, hover, and focus states
+6.3 — Locked Screen Anatomy (from the reference file, pixel-accurate)
+This is the exact structure visible in both the light and dark mode screenshots — reproduce it exactly, don't reinterpret spacing or component order.
+• Sidebar (fixed, left): logo mark (gradient shopping-bag icon) + "freshcart" wordmark + "Groceries in minutes." tagline → nav list (Home,
+Categories, Cook with AI with a small pink "AI" badge, Orders, Favourites, Wallet & Payments, Notifications with an unread-count badge,
+Settings), active item gets a soft lavender/elevated pill background → an "Install App" card at the bottom with phone-mockup art and a full-
+width primary-gradient "Install App" button.
+Freshcart · Consolidated Blueprint Rev 4.0 · 6
+
+
+--- PAGE 7 ---
+• Topbar: a large rounded floating search input (placeholder: Search for "milk", "bread" or "apple") with a search icon on the left and a mic
+icon on the right inside the field → "Deliver to" block with a location pin, saved address, and a chevron → cart icon with a red numeric
+badge → circular profile avatar photo.
+• Category chip row: rounded-square icon tiles over a label, one per category (Fruits & Veggies, Dairy & Eggs, Snacks & Branded,
+Beverages, Staples, Personal Care, Home Care, Baby Care, plus a trailing "More" tile with an ellipsis icon).
+• Hero row (two columns): left — a large dark, rounded "Cook something delicious today!" card with a dish photograph, a one-line subcopy,
+and a primary-gradient "Try Cook with AI →" button; right — a "Buy it again" panel (title + "View all" link + up to 3 small square product
+thumbnails) stacked above a "Get 10% off on your first 3 orders" promo strip with a gift icon, a bolded code ( HELLO10 ), and a trailing
+chevron.
+• Best deals for you: section header + "View all" link, then a horizontal row of product cards — each card: product illustration, name, pack
+size, discounted price with a strikethrough original price, a green "X% OFF" badge top-left, and a circular red "+" add-to-cart button bottom-
+right.
+• Persistent cart panel (fixed, right): "My Cart (N)" header + "Clear all" link → line items (image, name, pack size, price, a stepper with −
+qty +, and a trash/remove icon) → a green "Wallet Discount Applied — You saved ₹X" confirmation strip with a checkmark → an itemized
+price breakdown (Item Total, Delivery Fee, Packaging Fee, Wallet Discount) → a bold "To Pay ₹X" total line → a full-width primary-gradient
+"Checkout →" button.
+Dark mode is not an inversion. Card boundaries in dark mode come from the elevated-surface color ( #181C26 on #08090C ), not from borders
+getting brighter — badges, discount tags, and gradient buttons keep their exact light-mode colors unchanged in dark mode, which is what keeps the
+screenshot's dark version feeling premium rather than washed out.
+6.4 — Screens Not Yet in the Reference File (extend the same system to these)
+The reference file only demonstrates Home in both modes. Phase 0's job also includes extending the exact same tokens/components to: Search &
+Category grid (filter sidebar, skeleton loading, typo-tolerant suggestion dropdown), Product Detail (low-stock indicator, add-to-cart micro-interaction —
+thumbnail scales down and arcs into the cart icon over ~400ms), Cook-with-AI modal (input field → servings chips 2/4/6/8+ → loading state → ingredient-
+checklist result screen with exact/closest match-type badges, green vs amber, per Phase 5), Swap bottom-sheet, Order Tracking (status timeline + live
+map with a moving rider marker and ETA countdown badge), Wallet & Payments, and Notification Preferences.
+Freshcart · Consolidated Blueprint Rev 4.0 · 7
+
+
+--- PAGE 8 ---
+SECTION 7
+Phase-Wise Build Plan — Phase 0 through Phase 9
+Ten phases, MVP-first, design-locked from day one. Each phase includes a ready-to-paste master prompt, self-contained enough that a
+coding agent doesn't need this conversation's history. Every phase after Phase 0 assumes the design tokens exist and imports them — no
+phase should ever invent a new color or spacing value.
+Freshcart · Consolidated Blueprint Rev 4.0 · 8
+
+
+--- PAGE 9 ---
+Phase 0 — Design System Lock-In REPLACES OLD PHASE 0 + OLD PHASE 10 Weeks 1-2
+Goal: Port the exact, already-finished design from freshcart_redesign_prototype.html into a real, reusable component library and
+design-tokens file — light and dark mode both, pixel-accurate. This is not a design exploration phase; it's a lock-and-port phase.
+Deliverables: design-tokens.json , a component library (Sidebar, Topbar/Search, CategoryChip, ProductCard, HeroBanner,
+PramarshaBanner, CartPanel, SwapSheet, CookWithAIModal, RecipeResultChecklist, WalletCard, NotificationPermissionPrompt), hi-fi specs for
+every screen in Section 6.4, and PWA icon assets.
+MASTER PROMPT — Phase 0
+You are a frontend engineer porting the FINISHED "Freshcart" design into real
+componentized JSX. This is a locked design — do NOT propose alternatives, do NOT "improve" the
+palette, do NOT invent new spacing values. Your only job is faithful, pixel-accurate porting.
+SOURCE OF TRUTH: freshcart_redesign_prototype.html (attached), in both light and
+dark mode, is the literal target. Treat every color, radius, spacing value, and component arrangement
+in it as final. Where this prompt gives hex values, they came directly from that file's :root and
+body.dark CSS blocks — use them exactly.
+TASK 1 — DESIGN TOKENS FILE (design-tokens.json, imported into tailwind.config.js,
+never hand-typed elsewhere in the app):
+Light: background #F7F8FA, surface #FBFBFC, card #FFFFFF, navbar rgba(255,255,255,0.82) + backdrop
+blur, text-primary #111111, text-secondary #6B7280, border #ECEEF2, divider #F2F4F7.
+Dark: background #08090C, surface #111827, elevated-card #181C26, navbar rgba(8,9,12,0.72) + backdrop
+blur, text-primary #FFFFFF, text-secondary #A3A3A3, border #252A36.
+Brand: primary-gradient #6366F1 → #8B5CF6, accent-gradient #8B5CF6 → #EC4899 → #F97316, cta-gradient
+#6366F1 → #F97316. Semantic: success #22C55E, warning #F59E0B, error #EF4444, info #3B82F6.
+Pramarsha-gradient: teal → green, RESERVED — never apply this gradient to any non-Pramarsha surface,
+add an ESLint-visible naming convention (e.g. a `pramarsha-` prefixed Tailwind class) so this is hard
+to violate by accident. Type scale: hero 48px, page-heading 32px, section-heading 24px, card-title
+18px, body 16px, small 14px, caption 12px, weights Medium/SemiBold only. Spacing scale 4/8/12/16/24/32.
+Font stack: Geist, Inter, SF Pro Display.
+TASK 2 — DARK MODE: implement via a `dark` class on <body> (not a second
+stylesheet), toggled from an icon button in the topbar, state held in React context so every route
+respects it, not just Home. Default to `prefers-color-scheme`; a user toggle overrides it for the
+session. Confirm every badge, gradient button, and discount tag keeps its EXACT light-mode color in
+dark mode — only backgrounds/borders/text shift.
+TASK 3 — COMPONENT LIBRARY, matching the reference file's structure exactly:
+a. Sidebar — logo mark (gradient shopping-bag icon) + wordmark + tagline; nav list (Home, Categories,
+Cook with AI with a small pink "AI" badge, Orders, Favourites, Wallet & Payments, Notifications
+with unread-count badge, Settings), active item gets a soft elevated/lavender pill; bottom
+Install-App card with a gradient CTA button.
+b. Topbar — rounded floating search input with a search icon left and a MIC ICON right-inside the
+field (wired to real recognition in Phase 3, static icon for now); "Deliver to" block (pin +
+address + chevron); cart icon with red numeric badge; circular avatar.
+c. CategoryChip row — rounded-square icon tile + label, one per category, plus a trailing "More" tile.
+d. HeroBanner — dark cinematic "Cook something delicious today!" card with dish photography and a
+primary-gradient "Try Cook with AI →" CTA; a "Buy it again" panel (title, View-all link, up to 3
+thumbnails) stacked above a "Get 10% off" promo strip with gift icon + bold code + chevron.
+e. PramarshaBanner — SEPARATE component from HeroBanner, using ONLY the reserved teal/green gradient,
+an eyebrow "Pramarsha — Right about now" label, a dynamic headline, 2-3 product thumbnails, and an
+"Add all" action. Build it now even though it's wired to real data in Phase 7 — use placeholder
+content so the component exists and is stylistically correct.
+f. ProductCard — image, name, pack size, discounted price + strikethrough original, green "X% OFF"
+badge top-left, circular red "+" add button bottom-right, hover elevation.
+g. CartPanel — "My Cart (N)" header + Clear-all link, line items (image, name, pack size, price,
+stepper, remove icon), a green "Wallet Discount Applied" confirmation strip, itemized price
+breakdown, bold "To Pay" total, full-width gradient Checkout CTA.
+h. SwapSheet, CookWithAIModal (input → servings chips 2/4/6/8+ → loading → result), and
+RecipeResultChecklist (checkbox per row, matched product, exact/closest-match badge — green vs
+amber — note text, price, sticky footer with running total) — build to spec even though they're
+wired to real data in Phases 4-6.
+TASK 4 — MOTION SPEC: add-to-cart micro-interaction (thumbnail scales down and arcs
+into the cart icon over ~400ms), 200-300ms transitions everywhere else, skeleton loading states for
+Freshcart · Consolidated Blueprint Rev 4.0 · 9
+
+
+--- PAGE 10 ---
+search/category grid, optimistic-update pattern for swap and cart actions.
+TASK 5 — PWA IDENTITY: app icon at 192px/512px, a maskable-icon safe-zone variant,
+and a splash-screen spec (brand background + centered logo).
+DELIVERABLE: design-tokens.json, the full component library above, hi-fi specs for Search/Category,
+Product Detail, Order Tracking, Wallet & Payments, and Notification Preferences (not shown in the
+reference file — extend the same system to them), and the PWA icon set.
+Definition of Done: Toggling dark mode changes every visible surface with zero unstyled/mismatched elements · every gradient button/badge
+is pixel-identical to the reference file in both modes · the Pramarsha teal/green gradient appears nowhere outside PramarshaBanner · grep the
+repo and confirm zero hardcoded hex colors outside design-tokens.json.
+Freshcart · Consolidated Blueprint Rev 4.0 · 10
+
+
+--- PAGE 11 ---
+Phase 1 — Core E-Commerce MVP CARRIES OVER Weeks 3-7
+Goal: A fully working storefront — browse, search, cart, checkout, order history with live tracking, wallet/referral, admin inventory — styled
+against Phase 0's locked tokens from day one, installable as a PWA from day one, zero recipe-AI yet.
+Deliverables: PostgreSQL schema (Section 5), Express REST API in plain JavaScript, React storefront + admin panel consuming Phase 0's
+component library directly, JWT + OTP auth, a seeded catalog from the real-SKU reference list (Section 8), dark-store assignment, wallet/referral
+ledger, simulated live rider tracking, typo-tolerant predictive search, installable PWA shell.
+MASTER PROMPT — Phase 1
+You are a senior full-stack engineer. Build the MVP of "Freshcart" using: React 18 +
+Vite + plain JavaScript (.jsx only, no .ts/.tsx anywhere) + Tailwind CSS configured against Phase 0's
+design-tokens.json on the frontend; Node.js + Express + plain JavaScript (ESM, "type": "module", no
+typescript/ts-node/@types packages) on the backend; PostgreSQL 16 as the only database; Redis for
+session/cache. No MongoDB anywhere. Because there is no compiler, validate every request/response shape
+at runtime with Joi.
+PROJECT STRUCTURE: monorepo — /frontend (Vite React app importing Phase 0's
+component library and design-tokens.json), /backend (Express API), /shared (Joi schemas, order-status
+enums, a money.js helper), /scripts (seed script + migration runner). Plain npm workspaces.
+SCHEMA: implement the core tables from Section 5 of this blueprint — users,
+addresses, categories, brands, products (including the pack_size_value column, needed later by Phase 5),
+reviews, product_scores, carts/cart_items, orders/order_items, dark_stores, wallet_transactions,
+referral_codes, push_subscriptions. Do NOT create recipes/recipe_ingredients — those tables no longer
+exist in this design; recipe_cache is created in Phase 4, not here.
+API ENDPOINTS:
+- AUTH: POST /auth/otp/request, POST /auth/otp/verify, POST /auth/refresh.
+- CATALOG: GET /categories, GET /products?category=&search=&page=&sort= (combine pg_trgm
+similarity with the tsvector index — a misspelled "bananna" must still return bananas), GET
+/products/:id, GET /products/:id/also-bought (stub until Phase 2).
+- SEARCH SUGGEST: GET /search/suggest?q= → up to 6 ranked suggestions after as few as 2 typed
+characters, blending trigram matches with the requesting user's own past purchases weighted higher.
+- CART: POST/PATCH/DELETE /cart/items, GET /cart → must include wallet_balance_available and a
+dark_store_id resolved from the user's default address.
+- CHECKOUT: POST /orders — one DB transaction: decrement stock atomically, resolve nearest active
+dark_store via haversine distance, apply wallet balance up to a documented cap (e.g. 50% of order
+value), insert order + order_items. GET /orders, GET /orders/:id.
+- LIVE TRACKING: GET /orders/:id/tracking → {status, rider_lat, rider_lng, eta_seconds, timeline}.
+Simulate via server-side linear interpolation from the dark store to the delivery address — document
+this as a simulation in the README, not real fleet infrastructure.
+- REVIEWS, WALLET & REFERRAL, PUSH SUBSCRIBE, ADMIN CRUD — exactly as specified in Rev 2.0 of this
+blueprint (unchanged): wallet cap documented explicitly, referral credits both parties once via
+wallet_transactions, push_subscriptions upserted per device.
+FRONTEND SCREENS, built from Phase 0's component library (do not restyle, only
+wire to real data): Home (search with the static mic icon placeholder, category chips, HeroBanner,
+PramarshaBanner with placeholder content, ProductCard grid, CartPanel), Product listing with filter
+sidebar, Product Detail, Checkout flow (Razorpay TEST MODE for cards/UPI, mock BNPL acceptable), Order
+history + Order detail (status timeline AND live map via Leaflet + OpenStreetMap tiles, self-hosted per
+Section 2), Wallet & Payments, role-protected /admin for inventory/dark-store CRUD and an orders
+table.
+PWA REQUIREMENTS (now, not deferred): vite-plugin-pwa generating a manifest.json
+(name "Freshcart", theme color from design-tokens.json, maskable + any-purpose icons at 192/512px) and a
+precaching service worker.
+NON-FUNCTIONAL: all prices as NUMERIC(10,2), never raw JS floats — a tested
+shared/money.js module used everywhere. Joi schemas per resource. Pagination on every list endpoint.
+Rate-limit OTP-request and search-suggest. Strict ESLint (react + jsx-a11y plugins) failing CI on any
+error, not just warnings.
+SEEDING: the ~45 real-brand products from Section 8 verbatim, then
+programmatically generated synthetic-but-realistic SKUs in the same style until 300-500 total products
+across the 7 categories, at least 3 brands per subcategory. Seed 2-3 dark_stores centered on a real
+Indian city.
+Freshcart · Consolidated Blueprint Rev 4.0 · 11
+
+
+--- PAGE 12 ---
+DELIVERABLE: a `docker-compose up`-runnable app, seed script, migration runner, README (setup +
+simulated-tracking caveat + wallet-cap rule), CI where lint and test both must pass.
+Definition of Done: browse → cart → checkout → confirmation works entirely in plain JavaScript (grep confirms zero .ts/.tsx files) · search
+survives 2 deliberately misspelled test queries · wallet balance correctly reduces checkout total and logs a wallet_transactions row · live tracking
+marker moves and ETA counts down toward zero · install prompt appears in Chrome · every screen visibly matches Phase 0's tokens, not
+Tailwind defaults · lint and test both pass in CI.
+Phase 2 — Reviews, Ratings & Recommendation Engine v1
+Weeks 8-9
+UNCHANGED
+Goal: Turn raw star ratings + review text into a single trustworthy "best product" score per item — the foundation the swap feature, the ingredient
+matcher's product picks, and Pramarsha's cohort scoring all lean on.
+Deliverables: a fine-tuned sentiment classifier, a Bayesian-average rating calculation, a nightly job populating product_scores, a best-in-category
+API, a user-affinity endpoint reused by Phase 8's predictive home feed.
+MASTER PROMPT — Phase 2
+You are an ML engineer. Build a standalone Python/FastAPI microservice
+`recommendation-service` for "Freshcart," fully self-hosted, no external AI API calls.
+TASK 1 — SENTIMENT SCORING: fine-tune `distilbert-base-uncased-finetuned-sst-2-english`
+(LoRA is fine) on 1,000-2,000 labelled Indian-grocery-style reviews you construct/simulate, using the
+real product names from Section 8. Expose POST /score-review → {sentiment_score: float in [-1,1]}. The
+Node backend calls this on every new review and stores the result.
+TASK 2 — WEIGHTED RATING: Bayesian average, weighted_rating =
+(v/(v+m))*R + (m/(v+m))*C, m=10, C=catalog mean rating.
+TASK 3 — FINAL SCORE: final_score = 0.5*normalized(weighted_rating) +
+0.3*normalized(avg_sentiment) + 0.2*normalized(sales_velocity_last_30_days). Nightly job (cron or a
+BullMQ repeatable job) upserts product_scores, plus incrementally on each new review.
+TASK 4 — BEST-IN-CATEGORY API: GET /best-in-category/{category_id}?
+exclude_product_id= → ranked list by final_score, used by the swap feature (Phase 6) and the ingredient
+matcher's default-pick logic (Phase 5).
+TASK 5 — USER AFFINITY: GET /user-affinity/{user_id} → ranked
+{category_id/product_id, affinity_score} derived from order history + sentiment, computed in the same
+nightly job. This is the only piece Phase 8's predictive home feed needs — no new model required there.
+INTEGRATION: services/recommendationClient.js in Node — fetch with a ~300ms
+timeout and a graceful fallback to a plain "most reviewed in category" SQL query if the service is
+unreachable. Write an explicit test that kills the container and confirms storefront browsing/checkout
+still work.
+DELIVERABLE: Dockerized FastAPI service, training script + saved checkpoint, unit tests for the
+Bayesian/normalization math, an evaluation report (F1 on a held-out review set).
+Definition of Done: /best-in-category returns a stable ranking for a fixed snapshot · /user-affinity returns non-empty results for any user with 3+
+orders · killing the service never breaks checkout/browsing · sentiment F1 is documented with an actual number.
+Freshcart · Consolidated Blueprint Rev 4.0 · 12
+
+
+--- PAGE 13 ---
+Phase 3 — Voice Search & Text Intent Understanding
+Weeks 10-11
+REPLACES OLD PHASE 3
+Goal: Real, working voice search on the topbar mic icon, plus reliable dish-name + servings extraction from free text for the Cook-with-AI entry
+point. Photo-based dish recognition and self-hosted speech-to-text are intentionally cut from this revision — see the callout below.
+Old Phase 3 built a fine-tuned Faster-Whisper STT service and a fine-tuned SigLIP/ViT dish-photo classifier — real ML work, real GPU cost.
+Both are cut here: voice now runs on the free, client-side Web Speech API (good enough for search and for "what dish do you want to cook,"
+and zero hosting cost), and there's no camera step in the locked Cook-with-AI modal design (Section 6.4) to justify a vision model. If you
+want photo input later, it's a clean addition — see Risks & Limitations.
+Deliverables: real Web Speech API voice search wired into the topbar (and reused by Phase 8's voice quick-add), a fine-tuned MiniLM/DistilBERT
+NER model for dish + servings extraction from typed or transcribed text.
+MASTER PROMPT — Phase 3
+You are a frontend + ML engineer. Two sub-tasks: real voice search (frontend-only,
+no new backend service), and a self-hosted text-intent NER model (Python/FastAPI).
+SUB-TASK A — VOICE SEARCH (real implementation, not a mock animation): use the
+browser's native Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`) as the ONLY
+implementation — genuinely free, no model hosting, runs entirely client-side. On mic click: start
+recognition, show a listening state identical to Phase 0's pulsing-mic spec, populate the search input
+with the final transcript on `onresult`, trigger the existing product search from Phase 1. Detect
+support via `('webkitSpeechRecognition' in window)`; disable the mic icon with a tooltip on unsupported
+browsers (notably Firefox) rather than a broken button. Do NOT build a server-side STT fallback for
+this — it re-adds the exact GPU/hosting cost this phase is designed to avoid, for a nice-to-have.
+SUB-TASK B — TEXT INTENT + SERVINGS (self-hosted, `input-understanding-service`):
+fine-tune `distilbert-base-uncased` (or `microsoft/MiniLM-L12-H384-uncased` for speed) as a
+token-classification model extracting a DISH span and, if present, a SERVINGS number, from free text in
+English and Hinglish. Build 500-1000 synthetic training examples covering phrasing variants ("I want to
+cook X", "banana hai X", "recipe for X for 6 people", "X ke liye ingredients chahiye"). Expose POST
+/parse-text {text} → {dish_name, servings_if_mentioned}. If this endpoint receives a transcript from
+Sub-task A (voice quick-add reuses this same transcript in Phase 8), it must handle spoken-style
+phrasing too. If no servings number is found — the common case — the frontend falls back to the
+Phase 0-designed 2/4/6/8+ chip picker rather than asking again in free text.
+CONTRACT: POST /parse-text → {dish_name: string, servings: int|null,
+confidence: float}. Document in contracts/parse-text.md. This is the ONLY input the Cook-with-AI flow
+needs before it hands off to Kimi K3 in Phase 4 — no image, no audio blob crosses this boundary.
+DELIVERABLE: working voice search on Chrome/Edge/Safari with graceful disable elsewhere, the fine-tuned
+NER model + FastAPI service, contracts/parse-text.md, and a short doc noting p50/p95 inference latency
+for the NER endpoint.
+Definition of Done: clicking the mic, speaking, and seeing the transcript populate the search box works in Chrome with zero backend calls · at
+least 10 manually-tested phrasing variants (English + Hinglish) correctly extract dish_name, with servings correctly extracted when stated and
+correctly left null otherwise · unsupported browsers show a disabled-with-tooltip mic, never a broken one.
+Freshcart · Consolidated Blueprint Rev 4.0 · 13
+
+
+--- PAGE 14 ---
+Phase 4 — Kimi K3 Recipe Generation REPLACES OLD PHASE 4 Weeks 12-13
+Goal: dish name + servings → Kimi K3 generates an accurate, correctly structured recipe. This is the single, deliberate, scoped exception to "no
+third-party AI API" in the entire project — isolate it behind one client so the rest of the system never knows it's there.
+Deliverables: services/kimiRecipeClient.js , the recipe_cache table + migration, malformed-response handling with one retry, a
+graceful failure state.
+MASTER PROMPT — Phase 4
+You are a full-stack engineer building the real Cook-with-AI recipe-generation step
+for "Freshcart." This replaces the old curated-KB + fine-tuned-LLM approach entirely — do not build a
+recipes table, a FAISS retrieval index, or attempt any local fine-tuning here. Recipe generation is the
+ONLY step in the whole Cook-with-AI pipeline that calls a third-party API; ingredient matching,
+quantity math, and cart insertion (Phase 5) stay self-hosted and deterministic, same as every other AI
+component in this project.
+CLIENT: build services/kimiRecipeClient.js (Node) isolating one function:
+`generateRecipe(dishName, servings) -> {title, steps: string[], ingredients: [{name, qty, unit}]}` — the
+caller never touches the Kimi API directly. Call via an OpenAI-compatible endpoint — OpenRouter's
+`moonshotai/kimi-k3`, or Moonshot's own `api.moonshot.ai/v1` — check current free-credit/pricing terms
+in whichever console you use before hardcoding a cost assumption, since these change. Prompt Kimi K3 to
+return strict JSON matching the shape above; validate the response with Joi and retry once on malformed
+output before failing gracefully to a "couldn't generate that recipe, try rephrasing" UI state — never a
+silent crash or an empty cart.
+CACHING: cache successful (normalized dish_name, servings) responses in the
+recipe_cache table (id, dish_name, servings, title, steps JSONB, ingredients JSONB, source, created_at)
+so a repeat request never re-calls the API — this matters for both cost and quick-commerce demo speed.
+Check the cache before ever calling kimiRecipeClient.
+API CONTRACT: POST /ai/cook-this/generate {dish_name, servings} (auth) → the same
+{title, steps, ingredients, source: "kimi_api"|"cache", confidence?} shape either way, so the frontend
+never needs to know whether it hit cache or the live API. Document in contracts/generate-recipe.md.
+HONESTY NOTE (put this in the README, not just this prompt): Kimi K3's full open
+weights were not available at time of writing, and 2.8T parameters is far beyond single-GPU
+self-hosting even once released. This is a deliberate, scoped exception — not a reversal — of the
+project's zero-third-party-API principle; every other AI component in the system stays self-hosted.
+DELIVERABLE: kimiRecipeClient.js, the recipe_cache migration, the /ai/cook-this/generate endpoint,
+contracts/generate-recipe.md, and a manual test log of 15 dish/servings requests showing sensible
+output.
+Definition of Done: requesting the same dish+servings twice only calls the Kimi API once (verify via a log/timing check on the second call) · a
+deliberately malformed/failed response shows the retry/rephrase state, never a crash · the response shape is identical regardless of cache hit or
+miss.
+Freshcart · Consolidated Blueprint Rev 4.0 · 14
+
+
+--- PAGE 15 ---
+Phase 5 — Ingredient Matching, Quantity-Aware Pack Selection &
+Weeks 14-16
+Auto-Cart MERGES OLD PHASE 5 + NEW LOGIC
+Goal: Turn Kimi K3's ingredient list into real, in-stock, correctly-sized products sitting in the cart — fully editable, only from products actually in
+stock at the user's resolved dark store. This phase now includes genuinely new deterministic pack-selection logic that didn't exist in Rev 2.0.
+MASTER PROMPT — Phase 5
+You are a full-stack engineer connecting Phase 4's Kimi K3 output to the live
+product catalog. All code stays plain JavaScript.
+STEP 1 — INGREDIENT MATCHING (self-hosted, `matcher-service` FastAPI, or extend
+recommendation-service): for each ingredient name+unit, (a) exact/fuzzy match via RapidFuzz against
+product names and a maintained ingredient-alias table, (b) if confidence < 0.75, fall back to
+semantic search using `sentence-transformers/all-MiniLM-L6-v2` embeddings over product titles
+(precomputed, refreshed on catalog change), (c) among matched candidates in the right category AND in
+stock at the user's dark_store_id, call the recommendation-service's /best-in-category endpoint
+(Phase 2) to shortlist candidates, (d) cache resolutions in ingredient_product_map keyed on
+(ingredient_name, dark_store_id). Do NOT change this step based on Kimi K3 — it only replaces recipe
+text, never the grounding.
+STEP 2 — QUANTITY-AWARE PACK SELECTION (new, pure deterministic logic — never
+hand this to an LLM): implement `selectPack(neededQty, candidatePacks) -> {productId, qty, matchType,
+note}`:
+a. If any single pack's size P >= needed qty Q exists, pick the smallest such P. Tag "exact_match"
+if P <= Q*1.2, else "closest_match".
+b. If no single pack covers Q but n = ceil(Q/P) packs of the same product cover it reasonably,
+recommend qty=n, tag "closest_match", with a note like "3 x 200g packs ≈ 600g — closest match to
+500g".
+c. If the only available pack is far larger than Q (e.g. only a 5kg bag for a 50g need), still
+surface qty=1, tagged "oversized" with a note like "smallest available pack — more than you need."
+Never leave an ingredient unresolved without an explicit tag.
+d. If NO product matches at all, mark unavailable and exclude from auto-cart.
+Write unit tests covering all four branches.
+STEP 3 — FINALIZE ENDPOINT (Node): POST /ai/cook-this/finalize {ingredients,
+dark_store_id, user_id} → calls matcher-service, runs each result through selectPack(), inserts matched
+products into cart_items with source='ai_recipe' inside one DB transaction, and writes an
+ingredient_product_map row per resolution (match_type, qty, note).
+STEP 4 — RESULT SCREEN (uses Phase 0's RecipeResultChecklist component exactly):
+checkbox per row (checked by default), matched product name + pack size, the match-type badge
+(exact/closest = green, oversized = amber, per Phase 0's semantic-color tokens), the human-readable
+note, and price. Sticky footer shows running total of checked items + "Add checked items to cart."
+Any ingredient below 0.75 confidence shows "not sure about this one — tap to search manually" instead
+of auto-selecting.
+EDGE CASES: ingredient matches nothing in the catalog ("not available — skip");
+matches something globally but nothing in stock at this dark store ("out of stock nearby," distinct
+from "not available at all"); the same ingredient needed by two concurrent recipe sessions (idempotent
+insert); user edits quantity on the result screen (recompute price live with shared/money.js, never
+re-call any AI service).
+DELIVERABLE: matcher-service, selectPack() with unit tests for all 4 branches, the finalize endpoint,
+the wired-up result screen, and a manual test log of 15 recipes against the seeded catalog documenting
+match accuracy and how many resolved to an in-stock product.
+Definition of Done: all 15 test recipes produce a fully populated, checked-by-default checklist with at most 2 "not available" items each ·
+selectPack() unit tests pass for all 4 branches · editing quantity updates price instantly with zero AI calls · the result screen visibly shows at least
+one exact-match and one closest-match badge in a real end-to-end test · out-of-stock-nearby is visually distinct from not-in-catalog.
+Freshcart · Consolidated Blueprint Rev 4.0 · 15
+
+
+--- PAGE 16 ---
+Phase 6 — Brand Swap Feature UNCHANGED Weeks 17-18
+Goal: Let the user swap any cart item — AI-added or manually added — for a same-category alternative, ranked by Phase 2's recommendation
+score, styled exactly to Phase 0's SwapSheet component.
+MASTER PROMPT — Phase 6
+You are a full-stack engineer building the brand-swap feature, plain JavaScript
+throughout.
+BACKEND: GET /cart/items/:id/swap-options → looks up the item's category, queries
+recommendation-service's /best-in-category excluding the current product AND filtered to in-stock at
+the order's dark_store_id, returns the top 4 alternatives ranked by final_score with {product_id, name,
+brand, price, rating, image_url, price_delta}. Broaden to the parent category if fewer than 2
+alternatives exist in the exact subcategory.
+BACKEND: PATCH /cart/items/:id/swap {new_product_id} → atomically updates product_id and qty-adjusted
+price (shared money.js) inside a transaction, preserving the original `source` field so an AI-added item
+that gets swapped still shows "from your recipe."
+FRONTEND: use Phase 0's SwapSheet component exactly — current product greyed/marked "current" at top,
+up to 4 alternative cards with rating stars, price, and a "+/-Rs X vs current" delta badge. Tapping a
+card triggers an optimistic swap (roll back on API error), closes the sheet, shows a brief toast. Include
+a loading skeleton and an empty state.
+NON-FUNCTIONAL: target under 400ms for swap-options by relying on Phase 2's precomputed product_scores
+table, never computing scores live.
+DELIVERABLE: swap flow wired into Cart and the Recipe Result screen, plus a short note confirming this
+reuses Phase 2's scoring rather than building a second recommendation system.
+Definition of Done: swap-options returns under 400ms warm-cache · a swapped AI-added item still shows "from your recipe" · a failed
+optimistic swap rolls back cleanly with an error toast · the empty-alternatives state renders for at least one deliberately tested niche category.
+Freshcart · Consolidated Blueprint Rev 4.0 · 16
+
+
+--- PAGE 17 ---
+Phase 7 — Pramarsha Home Banner Integration & Catalog/User
+Weeks 19-20
+Scale-Up NEW (was Addendum Phase 12)
+Goal: Surface the already-built, already-mining Pramarsha temporal behavior engine on the Home screen via its own dedicated banner (never
+the generic recommendation rail), and scale the catalog and synthetic user base so both the storefront and Pramarsha's cohort mining look real
+in a demo.
+Constraint carried through everything below: Pramarsha's own event-logging, mining pipeline ( mine_patterns.py ), and behavior-
+engine-service already work. This phase touches only the Home surface and seed-data volume — never the mining logic, schema, or API
+contract. If a genuine change there turns out necessary, stop and flag it explicitly rather than changing it silently.
+MASTER PROMPT — Phase 7
+You are extending "Freshcart" + the existing Pramarsha service. Do not rebuild
+anything Pramarsha already does — this phase changes only the Home surface and seed data volume.
+TASK 1 — HOME BANNER: replace Phase 0's placeholder PramarshaBanner content with
+real data. Match the locked spec exactly: teal/green gradient icon, "Pramarsha — Right about now"
+eyebrow label, a dynamic headline sourced from the winning reason_tag (e.g. "Your Sunday staples are
+ready"), 2-3 product thumbnails, an "Add all" action calling the existing cart-insert flow. If GET
+/home/recommendations (or the existing equivalent) returns an empty array for the current context, hide
+the banner entirely — never show a placeholder or a stale previous result.
+TASK 2 — SCALE THE PRODUCT CATALOG: extend the Phase 1 seed script from ~300-500
+products to 500+ across the existing categories: real reference SKUs as the base (Section 8),
+programmatically generated plausible variants on top, with at least 3-4 distinct pack sizes per common
+ingredient category (paneer, atta, rice, oil, dal) specifically because Phase 5's selectPack() needs
+real pack-size variety to demonstrate all its match types.
+TASK 3 — SCALE SYNTHETIC USERS FOR PRAMARSHA: extend the seed data from a handful
+of test users to roughly 150-300 synthetic users with a realistic mix, not just more of the same
+pattern: ~30% with one strong, clear day/time habit; ~40% with a weaker/noisier pattern that should
+correctly NOT produce a personal rule (your regression check that the confidence threshold still
+filters noise at volume); ~30% with no meaningful pattern or too few orders (cold-start population,
+exercising the cohort_time_patterns fallback). Re-run mine_patterns.py against this population and
+spot-check that cohort_time_patterns reflects believable platform-wide signal rather than being
+dominated by 1-2 users.
+DELIVERABLE: the real Home banner component wiring, the expanded seed script, and a short note
+confirming the full Pramarsha verification checklist (personal rules, negative controls, cold-start
+fallback, service-down resilience) still passes against the larger population.
+Definition of Done: the Pramarsha banner renders on Home in both light and dark mode, matching the reference file's styling, and disappears
+cleanly with no matching recommendation · catalog is 500+ verified by count query, with 4+ categories having 3+ pack-size variants for the
+same ingredient · re-running verification against 150-300 synthetic users still shows correct personal rules, a correctly-empty noisy/negative-
+control cohort, and a non-empty cohort fallback for brand-new users.
+Freshcart · Consolidated Blueprint Rev 4.0 · 17
+
+
+--- PAGE 18 ---
+Phase 8 — Advanced/Modern Feature Layer UPDATED (was old Phase 7) Weeks 21-25
+Goal: Layer in the ten differentiator modules once the core loop (browse → AI cook → cart → swap → Pramarsha → checkout) is solid. Each
+ships as an independent, feature-flagged module.
+MASTER PROMPT — Phase 8
+You are a full-stack + ML engineer adding advanced features to the working
+"Freshcart" platform. Implement the following as independent, feature-flagged modules — any one can
+ship without the others.
+1. SMART PANTRY — user_pantry(user_id, ingredient_name, added_at); filter matched ingredients (Phase 5)
+against the user's pantry before adding to cart, with a "3 items skipped — already in your pantry"
+note.
+2. HANDS-FREE COOKING MODE — full-screen step-by-step view of Phase 4's steps[] array, large text,
+next-step swipe/tap, optional voice read-aloud via the self-hosted `Kokoro-82M` TTS model served from
+a lightweight `tts-service`, screen-wake-lock enabled.
+3. WEEKLY MEAL PLANNER — accepts preferences (veg/non-veg, cuisine tags, days=7), calls Phase 4's Kimi
+K3 client 5-7 times with varied dish suggestions (maintain a popular-dishes-by-day-of-week seed list
+to avoid repetition), runs all results through Phase 5's matcher, deduplicates/sums quantities across
+recipes into one consolidated cart.
+4. NUTRITION + COST CARD — extend recipe_cache with per-100g nutrition lookups (or a lightweight
+nutrition-lookup table you seed separately, since the old curated-recipe dataset that carried this
+data is gone); compute total calories/protein/cost for the given servings.
+5. DIETARY FILTERS — dietary_tags array on products (already in Section 5's schema); filter Kimi K3
+prompts and swap suggestions by the user's active dietary profile.
+6. SOCIAL PROOF + GAMIFICATION — a product_view_events/order_events rollup showing "X people in your
+city ordered this today" above a minimum-count threshold (e.g. 10) to avoid looking fake on a
+low-traffic demo; a simple badges table for AI-recipe streaks.
+7. VOICE COMMERCE QUICK-ADD — reuses Phase 3's Web Speech API transcript directly
+(not a self-hosted STT endpoint, which no longer exists in this revision): a tap-and-hold mic
+button anywhere in the app accepting direct commands like "add two litres of milk and a loaf of
+bread," parsed via a lightweight rule-based/NER parser (quantity + unit + product-name span) and
+matched via Phase 5's matcher-service fuzzy/semantic step — skip recipe generation entirely, this is
+a shortcut path. Confirm parsed items in a review-chip list before adding to cart.
+8. PUSH NOTIFICATIONS & PWA ENHANCEMENTS — the soft pre-permission prompt from Phase 0, real Web
+Push via the `web-push` npm package + VAPID keys, a notification-worker (BullMQ) sending
+order-status, back-in-stock, and price-drop pushes, plus a notification-preferences endpoint.
+9. PREDICTIVE REORDER & PERSONALIZED HOME FEED — a Home rail powered entirely by Phase 2's
+/user-affinity endpoint (no new model): "You might need these," a moving-average-of-days-between-
+orders cadence heuristic, one-tap "add all." Keep this visually and functionally distinct from the
+Pramarsha banner — different rail, different data source, both allowed to coexist on Home.
+10. REFERRAL PROGRAM & CASHBACK WALLET — full share flow (native share sheet + copy-link fallback),
+a wallet transaction-history screen, a small admin view for manual goodwill credit.
+CONSTRAINT: none of these ten modules requires any new third-party AI API key or cloud-messaging
+account — Kokoro-82M, Web Push, and the Web Speech API reuse are all self-hosted or free/client-side,
+consistent with the rest of this project.
+DELIVERABLE: each module behind its own feature flag with its own migration where relevant, and a short
+README section per module.
+Definition of Done (per module): toggling any single flag off breaks nothing else · voice quick-add correctly parses 8+ of 10 manually-tested
+direct-add phrases · a test push notification is actually received for at least one trigger type · the predictive reorder rail changes suggestions
+against two different synthetic order-history patterns · referral redemption credits both parties exactly once, with a rejected-on-repeat test.
+Freshcart · Consolidated Blueprint Rev 4.0 · 18
+
+
+--- PAGE 19 ---
+Phase 9 — Testing, Optimization, Deployment & Scaling
+Weeks 26-28
+UPDATED (was old Phase 8)
+Goal: Make the whole system fast enough to feel like quick commerce, and deployable somewhere you can actually demo it — with a lighter
+GPU footprint than Rev 2.0, since the heaviest two models (Whisper, the fine-tuned recipe LLM) no longer exist in this design.
+MASTER PROMPT — Phase 9
+You are a DevOps/MLOps engineer preparing "Freshcart" for deployment and load
+testing.
+MODEL OPTIMIZATION (shorter list than Rev 2.0 — no Whisper, no recipe-LLM
+serving): export the fine-tuned NER model and the sentiment DistilBERT to ONNX with `optimum`, served
+via ONNX Runtime for 2-4x CPU inference speedup. Put a Redis-backed cache in front of the matcher
+(Phase 5) and recipe_cache (Phase 4), keyed on normalized dish_name+servings and (ingredient_name,
+dark_store_id).
+KIMI K3 RELIABILITY (new, since this is the one external dependency): implement a
+circuit breaker around kimiRecipeClient.js — a short timeout, one retry, then the graceful failure
+state; log every call's latency and token cost to a simple dashboard so cost doesn't silently creep;
+alert if the recipe_cache hit rate drops below a documented threshold (cache misses are the ones costing
+money).
+JAVASCRIPT BUILD HYGIENE (matters more with no TypeScript compiler): CI must run
+ESLint (fail on any error) and the full Jest/Vitest suite — including money.js tests and
+contract-conformance tests for every /contracts/*.md file — as a non-skippable pre-deploy step, plus a
+Prettier check.
+PWA & NOTIFICATION BUILD STEP: regenerate the Workbox precache manifest on
+every production build with a version-bump/cache-busting check in CI; deploy the notification-worker
+with the VAPID private key injected via secret, never committed.
+INFRASTRUCTURE: Docker Compose (dev) and a production Compose/lightweight k8s set
+with: postgres, redis, minio, node-api, react-frontend (static + nginx), ai-orchestrator,
+nlu-service (Phase 3), matcher-service (Phase 5), recommendation-service (Phase 2), tts-service
+(Phase 8), notification-worker (Phase 8). A single rented GPU instance (or CPU + quantization) is
+sufficient — no production-scale infrastructure needed.
+LOAD TESTING (k6/Locust): (a) 50 concurrent users on the core e-commerce path;
+(b) 10 concurrent users running the full Cook-with-AI flow end to end, measuring p50/p95 latency per
+stage — NLU parse, Kimi K3 call, matching, pack selection — separately, since Kimi's network round-trip
+is now the single biggest latency risk in the pipeline; (c) 20 concurrent users on live order tracking,
+confirming Socket.IO holds up.
+MONITORING: Prometheus + Grafana tracking per-service latency, matcher cache hit rate, Kimi K3 call
+volume/cost, and push-notification delivery success.
+CI/CD: GitHub Actions running lint + tests on every PR, manual-trigger deploy job.
+DELIVERABLE: docker-compose.prod.yml, load test scripts + a results report identifying the slowest
+pipeline stage (very likely the Kimi K3 network hop) and the mitigation applied, and a one-page
+deployment runbook covering VAPID setup and PWA cache-busting.
+Definition of Done: CI fails on a deliberately broken lint rule and a deliberately broken money.js test · load test report identifies the slowest AI-
+pipeline stage with a documented mitigation · a fresh deploy serves an updated service-worker version with no stale-cache bug · push
+notifications confirmed working against the deployed environment · Kimi K3 circuit breaker verified by manually blocking the API and confirming
+graceful degradation, not a crash.
+Freshcart · Consolidated Blueprint Rev 4.0 · 19
+
+
+--- PAGE 20 ---
+SECTION 8
+Integration & Final Definition of Done
+One consolidated pass if you want a single coding-agent session to sequence everything correctly, confirming each phase's Definition of
+Done before moving to the next.
+MASTER PROMPT — Full Integration Pass
+You are working on the "Freshcart" repository, building it from zero in this exact
+order, confirming each phase's Definition of Done before moving to the next:
+Phase 0 (design lock-in) → Phase 1 (core MVP against locked tokens) → Phase 2 (recommendation engine)
+→ Phase 3 (voice search + text intent) → Phase 4 (Kimi K3 recipe generation — the one external AI
+dependency) → Phase 5 (ingredient matching + quantity-aware pack selection) → Phase 6 (brand swap) →
+Phase 7 (Pramarsha Home banner + scaled seed data — never touch Pramarsha's own schema/mining logic) →
+Phase 8 (ten advanced modules, each independently flagged) → Phase 9 (testing, optimization,
+deployment).
+CONSTRAINTS carried through every phase: plain JavaScript only on frontend/backend (Python for AI
+microservices is fine, unaffected); every color/spacing value comes from Phase 0's design-tokens.json,
+never hardcoded; Kimi K3 is the only third-party AI API call anywhere in the system; Pramarsha's schema
+and mining logic are never modified, only consumed.
+FINAL END-TO-END TEST (one session, both light and dark mode): toggle dark mode · run a voice search ·
+complete a full Cook-with-AI flow with at least one exact-match and one closest-match ingredient visible
+· confirm the Pramarsha banner appears correctly for a patterned test user and disappears for a
+cold-start user · swap one cart item · complete a checkout with wallet balance applied · confirm a push
+notification fires on order-status change.
+DELIVERABLE: all nine phases' individual deliverables, plus one consolidated README section listing
+what changed from the original Rev 2.0 blueprint, and the final end-to-end test recording/log.
+Freshcart · Consolidated Blueprint Rev 4.0 · 20
+
+
+--- PAGE 21 ---
+SECTION 9
+Sample Product Catalog — Real-World Reference SKUs
+Unchanged from Rev 2.0 — still the literal seed for the first ~45 rows, then programmatically extended (Phase 1) to 300-500 SKUs and
+further scaled (Phase 7) to 500+, with pack-size variety layered on top for Phase 5's selectPack() to demonstrate against.
+Dairy
+Product Brand Unit Approx. MRP (₹)
+Gold Full Cream Milk Amul 500 ml 34
+Pasteurised Butter Amul 100 g 58
+Fresh Dahi (Curd) Mother Dairy 400 g 40
+Processed Cheese Slices Amul 200 g 125
+a+ Toned Milk Nestlé 1 L 66
+Cheese Cubes Britannia 180 g 110
+Mozzarella Cheese Go Cheese 200 g 145
+Vegetables (incl. fresh paneer)
+Product Brand Unit Approx. MRP (₹)
+Onion Unbranded/local produce 1 kg 32
+Potato Unbranded/local produce 1 kg 28
+Tomato Unbranded/local produce 1 kg 35
+Fresh Paneer Mother Dairy 200 g 90
+Coriander Leaves (Bunch) Unbranded/local produce 100 g 12
+Green Capsicum Unbranded/local produce 500 g 35
+Fruits
+Product Brand Unit Approx. MRP (₹)
+Banana (Robusta) Unbranded/local produce 1 dozen 55
+Alphonso Mango (seasonal) Unbranded/local produce 1 kg 180
+Apple (Shimla) Unbranded/local produce 1 kg 160
+Pomegranate Unbranded/local produce 1 kg 140
+Green Grapes Unbranded/local produce 500 g 65
+Staples
+Product Brand Unit Approx. MRP (₹)
+Whole Wheat Atta Aashirvaad 5 kg 255
+Iodized Salt Tata 1 kg 28
+Refined Sunflower Oil Fortune 1 L 145
+Freshcart · Consolidated Blueprint Rev 4.0 · 21
+
+
+--- PAGE 22 ---
+Basmati Rice India Gate 1 kg 115
+Toor Dal Tata Sampann 1 kg 165
+Deggi Mirch Masala MDH 100 g 65
+Garam Masala Everest 100 g 95
+Snacks
+Product Brand Unit Approx. MRP (₹)
+India's Magic Masala Chips Lay's 52 g 20
+Aloo Bhujia Haldiram's 200 g 55
+Good Day Cookies Britannia 200 g 40
+Glucose Biscuits Parle-G 200 g 25
+Mad Angles Bingo 72 g 20
+Masala Munch Kurkure 85 g 20
+Beverages
+Product Brand Unit Approx. MRP (₹)
+Tea Gold Tata Tea 500 g 255
+Classic Instant Coffee Nescafé 100 g 280
+Fruit Power Mixed Fruit Juice Real 1 L 115
+Orange Juice Tropicana 1 L 120
+Soft Drink Coca-Cola 750 ml 40
+Packaged Drinking Water Bisleri 1 L 20
+Personal Care
+Product Brand Unit Approx. MRP (₹)
+Strong Teeth Toothpaste Colgate 200 g 105
+Cream Beauty Bathing Bar Dove 125 g 65
+Antiseptic Liquid Dettol 550 ml 210
+Aloe Vera Gel Patanjali 150 ml 90
+Anti-Dandruff Shampoo Head & Shoulders 340 ml 340
+Soft Light Moisturizer Nivea 100 ml 185
+Prices are indicative, mid-2026 reference points for realism, not live pricing. Real brand names are standard practice for a personal/portfolio/
+hackathon demo catalog — don't scrape brand marketing photography for product images, and add a small "for demonstration purposes only"
+disclaimer if this is ever shown publicly.
+SECTION 10
+Freshcart · Consolidated Blueprint Rev 4.0 · 22
+
+
+--- PAGE 23 ---
+The "Cook This" AI Pipeline, End to End
+Dish name (typed, or voice-searched via the topbar and then typed into the modal — Section 6.4) + servings (typed or chip-picked) → Phase 3's
+NER model normalizes it if needed → Kimi K3 generates a structured recipe (Phase 4) → Phase 5's self-hosted matcher grounds every
+ingredient against your real catalog → selectPack() deterministically resolves the exact pack size(s) to add → an editable, checkbox-driven
+cart. The only non-deterministic, non-self-hosted step in this entire chain is the single Kimi K3 call — everything before and after it is auditable,
+cached, and under your control.
+SECTION 11
+AI Model & Dataset Reference Table
+Component Model Dataset / Source Hosting
+Voice search Browser Web Speech API N/A — native browser feature Client-side, free
+Text intent + servings distilbert-base- 500-1000 self-labelled English/ Self-hosted
+uncased / MiniLM-L12 Hinglish examples
+Recipe generation Kimi K3 (moonshotai/kimi-k3) N/A — frontier model via API Third-party API — the one exception
+Ingredient → product sentence-transformers/ Your own product-title/ingredient- Self-hosted
+matching all-MiniLM-L6-v2 + name pairs
+RapidFuzz
+Review sentiment distilbert-base- 1,000-2,000 simulated Indian Self-hosted
+uncased-finetuned- grocery reviews
+sst-2-english
+Recommendation / ranking Bayesian weighted rating Your own order + review + click logs Self-hosted
+(deterministic) + LightFM/small
+neural CF
+(Optional) Cooking-mode Kokoro-82M Off-the-shelf, no fine-tuning Self-hosted
+voice-out
+Speech-to-text (dish REMOVED — replaced by the Web Speech API row above
+request)
+Dish photo recognition REMOVED this revision — see Risks & Limitations for the future-phase note
+SECTION 12
+Pramarsha — Temporal Behavior Recommendation Engine
+(Context)
+Pramarsha is a separate, already-built personalization system: it logs user events, mines day/time-based ordering patterns
+(mine_patterns.py ), and serves recommendations from a dedicated behavior-engine-service . It is not built or modified anywhere in this
+blueprint — Phase 7 above is the only touchpoint, and it's additive only: a Home banner that consumes GET /home/recommendations , plus
+scaling this app's own seed data so Pramarsha's mining has enough signal to look real. Its own schema (event log, cohort_time_patterns ,
+personal_rules ) and mining logic are out of scope and must never be modified from this project.
+SECTION 13
+Complete Feature List
+Core
+• Product catalog, search (typo-tolerant, predictive), filters, categories — your inventory only
+• Voice search on the topbar (Web Speech API)
+Freshcart · Consolidated Blueprint Rev 4.0 · 23
+
+
+--- PAGE 24 ---
+• Cart, checkout, saved addresses, live order tracking, order history
+• Ratings & reviews per product
+• Cook-with-AI: typed (or voice-searched) dish name + servings → Kimi K3 recipe → auto-cart
+• Quantity-aware pack selection with exact/closest/oversized badges
+• Best-product recommendation per ingredient (rating + sentiment based)
+• Swap feature: alternate-brand suggestions, Zepto-style bottom sheet
+• Pramarsha Home banner: temporal-pattern-based recommendations, visually distinct from everything else on the page
+Advanced / Modern (Phase 8)
+• Smart Pantry, Hands-free Cooking Mode, Weekly Meal Planner, Nutrition & Cost Card, Dietary & Allergy Filters, Social Proof + Gamification,
+Voice Commerce Quick-Add, Push Notifications, Predictive Reorder Home Feed, Referral Program + Cashback Wallet
+• Installable PWA (from Phase 1), hyperlocal countdown/freshness UI, one-tap reorder, multilingual voice input (Hindi/English/Hinglish,
+handled natively by the browser's speech engine), flexible one-tap payments (UPI/cards/wallets/net banking/BNPL), micro-interaction polish
+throughout
+Not in this revision (future stretch): photograph-your-dish input. The reference design's Cook-with-AI modal is text-first, and Kimi K3's client only
+needs a dish name + servings — so this isn't blocking anything today. If you want it later, it slots back in as an independent module: a fine-tuned
+SigLIP/ViT classifier feeding its output into the same Phase 3 dish-name contract, nothing else in the pipeline needs to change.
+Freshcart · Consolidated Blueprint Rev 4.0 · 24
+
+
+--- PAGE 25 ---
+SECTION 14
+Testing, Deployment & Scaling Notes
+• Test pyramid: unit tests on selectPack() , the matcher's scoring math, and all money-math (highest-value tests given the no-TypeScript
+decision); integration tests on each FastAPI service and on kimiRecipeClient.js 's retry/cache logic; end-to-end tests (Playwright/
+Cypress) on the full cook-this → cart → checkout journey plus wallet-and-payment.
+• Latency budget: under 3 seconds total for the AI pipeline is realistic once recipe_cache and the matcher cache are warm — the Kimi K3
+network hop is now the dominant cost, not local model inference, which is the opposite latency profile from Rev 2.0.
+• Cost-aware scaling: GPU needs are lighter than Rev 2.0 — no Whisper, no recipe-LLM serving. Budget instead for Kimi K3 API usage;
+track cost per recipe generation and cache-hit rate from day one.
+• Data flywheel: ai_interaction_logs still lets you improve the self-hosted models (NER, matcher, sentiment) post-launch from real
+usage, even though recipe generation itself isn't something you fine-tune anymore.
+• No compiler, so lint/test discipline is not optional — unchanged from Rev 2.0: a failing ESLint or Jest run in CI is a hard blocker on
+every PR.
+SECTION 15
+Realistic Timeline & Effort Estimate
+Phase Duration Primary skill needed
+0 — Design system lock-in 2 weeks Frontend / component engineering
+1 — Core MVP 5 weeks Full-stack (React/Node/SQL, JavaScript)
+2 — Recommendation v1 2 weeks ML (NLP/sentiment)
+3 — Voice search + text intent 2 weeks Frontend + light ML (was 3 weeks in Rev 2.0 — Whisper/vision removed)
+4 — Kimi K3 recipe generation 2 weeks Full-stack API integration (was 3 weeks in Rev 2.0 — no fine-tuning/KB build)
+5 — Matching + pack selection + auto-cart 3 weeks Full-stack + ML integration (+1 week vs Rev 2.0 for the new selectPack logic)
+6 — Swap feature 2 weeks Full-stack
+7 — Pramarsha integration + scale-up 2 weeks Full-stack + data seeding (new phase)
+8 — Advanced features (10 modules) 5 weeks Full-stack + ML (pick a subset if short on time)
+9 — Testing/deploy 3 weeks DevOps/MLOps
+Total: ~24-26 weeks solo, part-time around coursework/internship — down from Rev 2.0's 27 weeks, mostly from removing the Whisper fine-
+tune and the recipe-LLM fine-tune, offset slightly by the new pack-selection logic and the Pramarsha integration phase. For a hackathon
+deadline: Phases 0-1 plus a cut-down Phase 3-5 (skip dietary filters, skip the meal planner) gets you a demo-able, exactly-on-brand "recipe-to-
+cart" AI feature with a real catalog in roughly 6-8 weeks.
+SECTION 16
+Risks & Honest Limitations
+• Kimi K3 is a real, non-optional external dependency now. Unlike every other AI component, this one is out of your control: rate limits,
+pricing changes, or an outage directly affect the flagship feature. The circuit breaker and cache in Phase 9 bound this risk; they don't
+eliminate it. Say this plainly if asked in an interview — it's a deliberate trade, not an oversight.
+• Photo-based dish input is genuinely gone from this revision, not deferred by accident. If a judge or interviewer asks "can it work from a
+photo," the honest answer is "not in this build — the reference design and the Kimi K3 pipeline are text-first, and adding vision back in is a
+clean, independent module if there's time."
+• Cold-start data problem — unchanged from Rev 2.0: ratings, reviews, and the Pramarsha cohort signal all need real usage to be
+meaningful; seed with synthetic-but-realistic data for the demo and say so upfront.
+• Pramarsha's quality is inherited, not built here. This blueprint doesn't audit or improve its mining logic — if its recommendations are
+weak, that's a pre-existing constraint, not something Phase 7 can fix without violating the "don't touch its schema/logic" rule.
+Freshcart · Consolidated Blueprint Rev 4.0 · 25
+
+
+--- PAGE 26 ---
+• selectPack() is a genuinely new algorithm with no prior production track record in this project — the four-branch logic is
+straightforward, but budget real time for the unit tests in Phase 5 rather than treating them as a formality.
+• Maps/payments/SMS still need external infrastructure services (Section 2) — not AI, so this doesn't conflict with the "no AI wrapper"
+principle, but worth stating clearly in any pitch.
+• Real brand names in the demo catalog are for demonstration purposes only and should not be used in a commercial product.
+SECTION 17
+Reference Links
+• Design reference: freshcart_redesign_prototype.html (light + dark mode, literal source of truth for Phase 0)
+• Kimi K3 access: OpenRouter ( moonshotai/kimi-k3 ) or Moonshot's own api.moonshot.ai/v1 — verify current pricing/rate limits
+before hardcoding assumptions
+• Web Speech API: MDN SpeechRecognition reference
+• Hugging Face models: distilbert-base-uncased , distilbert-base-uncased-finetuned-sst-2-english , microsoft/MiniLM-
+L12-H384-uncased , sentence-transformers/all-MiniLM-L6-v2 , Kokoro-82M
+• vite-plugin-pwa , web-push npm package, Razorpay test-mode docs
+Freshcart · Consolidated Blueprint Rev 4.0 · 26

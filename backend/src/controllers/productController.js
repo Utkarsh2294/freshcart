@@ -47,10 +47,17 @@ export const list = async (req, res, next) => {
     if (search) {
       selectSql += `,
         similarity(p.name, $${valIndex}) AS sml,
-        ts_rank(p.search_vector, plainto_tsquery('english', $${valIndex})) AS rank
+        ts_rank(p.search_vector, plainto_tsquery('english', $${valIndex})) AS rank,
+        CASE
+          WHEN LOWER(c.name) = LOWER($${valIndex}) THEN 3
+          WHEN c.name ILIKE $${valIndex + 1} THEN 2
+          WHEN p.name ILIKE $${valIndex + 1} THEN 1
+          ELSE 0
+        END AS intent_rank
       `;
       whereClauses.push(`(
         p.name ILIKE $${valIndex + 1}
+        OR c.name ILIKE $${valIndex + 1}
         OR similarity(p.name, $${valIndex}) > 0.2
         OR p.search_vector @@ plainto_tsquery('english', $${valIndex})
       )`);
@@ -95,7 +102,7 @@ export const list = async (req, res, next) => {
 
     let orderSql = ' ORDER BY p.id DESC';
     if (search) {
-      orderSql = ' ORDER BY sml DESC, rank DESC, p.name ASC';
+      orderSql = ' ORDER BY intent_rank DESC, rank DESC, sml DESC, p.name ASC';
     } else if (sort === 'deals') {
       orderSql = ' ORDER BY (COALESCE(p.mrp, p.price) - p.price) DESC, p.name ASC';
     } else if (sort === 'price_asc') {

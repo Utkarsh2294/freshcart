@@ -1,16 +1,43 @@
-import { useState } from 'react';
-import { Bell, ShoppingBag, Tag, Smartphone, Mail, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, ShoppingBag, Tag, Smartphone, Mail, AlertCircle, Send } from 'lucide-react';
+import * as notificationService from '../services/notificationService';
+import { useUiStore } from '../store/uiStore';
 
 export default function NotificationPreferences() {
   const [prefs, setPrefs] = useState({
-    pushOrders: true,
-    pushOffers: false,
-    emailOrders: true,
+    order_status: true,
+    back_in_stock: true,
+    price_drop: true,
     emailOffers: true,
     smsAlerts: false
   });
+  const { addToast } = useUiStore();
 
-  const toggle = (key) => setPrefs(prev => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    notificationService.getPreferences()
+      .then(data => setPrefs(prev => ({ ...prev, ...(data.preferences || {}) })))
+      .catch(() => {});
+  }, []);
+
+  const toggle = async (key) => {
+    const next = { ...prefs, [key]: !prefs[key] };
+    setPrefs(next);
+    if (['order_status', 'back_in_stock', 'price_drop'].includes(key)) {
+      await notificationService.updatePreferences({
+        order_status: next.order_status,
+        back_in_stock: next.back_in_stock,
+        price_drop: next.price_drop,
+      });
+    }
+  };
+
+  const sendTest = async () => {
+    const result = await notificationService.sendTestNotification();
+    addToast({
+      type: result.sent ? 'success' : 'info',
+      message: result.sent ? 'Test push sent.' : 'Test push queued. Add VAPID keys and subscribe this browser to receive it.',
+    });
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-12">
@@ -49,10 +76,10 @@ export default function NotificationPreferences() {
               </div>
             </div>
             <button 
-              onClick={() => toggle('pushOrders')}
-              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.pushOrders ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
+              onClick={() => toggle('order_status')}
+              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.order_status ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
             >
-              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.pushOrders ? 'translate-x-6' : 'translate-x-0'}`} />
+              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.order_status ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
           
@@ -62,18 +89,40 @@ export default function NotificationPreferences() {
                 <Tag className="w-6 h-6 text-[#F97316]" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Offers & Promos</h3>
-                <p className="text-sm text-gray-500">Discounts and new products</p>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Back in Stock</h3>
+                <p className="text-sm text-gray-500">Restock alerts for saved items</p>
               </div>
             </div>
             <button 
-              onClick={() => toggle('pushOffers')}
-              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.pushOffers ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
+              onClick={() => toggle('back_in_stock')}
+              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.back_in_stock ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
             >
-              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.pushOffers ? 'translate-x-6' : 'translate-x-0'}`} />
+              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.back_in_stock ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          <div className="p-6 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/50">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gray-50 dark:bg-[#0F111A] rounded-2xl">
+                <Tag className="w-6 h-6 text-[#14B8A6]" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Price Drops</h3>
+                <p className="text-sm text-gray-500">Lower price alerts</p>
+              </div>
+            </div>
+            <button
+              onClick={() => toggle('price_drop')}
+              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.price_drop ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
+            >
+              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.price_drop ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
+
+        <button type="button" onClick={sendTest} className="flex items-center gap-2 rounded-xl bg-[#111827] px-5 py-3 font-bold text-white">
+          <Send className="h-4 w-4" /> Send test order-status push
+        </button>
       </div>
 
       <div className="space-y-6">

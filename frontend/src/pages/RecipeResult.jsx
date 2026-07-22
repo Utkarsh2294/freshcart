@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Check, ChevronDown, Clock, Loader2, PackageCheck, ShoppingBag, Sparkles, Users } from 'lucide-react';
+import { Check, ChevronDown, Clock, Loader2, Maximize2, PackageCheck, RefreshCw, ShoppingBag, Sparkles, Users, Volume2, X } from 'lucide-react';
 import * as cookThisService from '../services/cookThisService';
 import { formatPrice } from '../utils/formatters';
 import { getProductImage } from '../utils/productImages';
 import { useAuth } from '../hooks/useAuth';
 import { useCartStore } from '../store/cartStore';
+import SwapSheet from '../components/common/SwapSheet';
+import { featureFlags } from '../utils/featureFlags';
 
 const badgeStyles = {
   exact: 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300',
@@ -20,15 +22,19 @@ export default function RecipeResult() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { fetchCart } = useCartStore();
-  const { dishName, servings, recipe, matches = [] } = location.state || {};
+  const { dishName, servings, recipe, matches = [], pantryNote = '' } = location.state || {};
+  const [localMatches, setLocalMatches] = useState(matches);
   const [selected, setSelected] = useState(() => new Set(matches.filter(match => match.selected && match.product).map(match => match.product.id)));
+  const [swapState, setSwapState] = useState({ isOpen: false, matchIndex: -1, options: [] });
   const [expandedStep, setExpandedStep] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [message, setMessage] = useState('');
+  const [cookingMode, setCookingMode] = useState(false);
+  const [cookingStep, setCookingStep] = useState(0);
 
   const selectedMatches = useMemo(() => {
-    return matches.filter(match => match.product && selected.has(match.product.id));
-  }, [matches, selected]);
+    return localMatches.filter(match => match.product && selected.has(match.product.id));
+  }, [localMatches, selected]);
 
   if (!recipe) {
     return (
@@ -52,6 +58,39 @@ export default function RecipeResult() {
     });
   };
 
+  const openRecipeSwap = (match, index) => {
+    const options = (match.alternatives || [])
+      .map(item => item.product)
+      .filter(Boolean)
+      .map(product => ({
+        ...product,
+        price_delta: Number((Number(product.price || 0) - Number(match.product?.price || 0)).toFixed(2)),
+        rating: product.rating || 4,
+      }));
+    setSwapState({ isOpen: true, matchIndex: index, options });
+  };
+
+  const applyRecipeSwap = (option) => {
+    const currentMatch = localMatches[swapState.matchIndex];
+    const nextSelected = new Set(selected);
+    if (currentMatch?.product) nextSelected.delete(currentMatch.product.id);
+    nextSelected.add(option.id);
+
+    setSelected(nextSelected);
+    setLocalMatches(prev => prev.map((match, index) => (
+      index === swapState.matchIndex
+        ? {
+          ...match,
+          selected: true,
+          product: option,
+          match_type: 'closest',
+          note: 'Swapped to an alternate in-stock product before adding to cart.',
+        }
+        : match
+    )));
+    setSwapState({ isOpen: false, matchIndex: -1, options: [] });
+  };
+
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
       navigate('/auth', { state: { from: { pathname: '/recipe-result' } } });
@@ -71,6 +110,22 @@ export default function RecipeResult() {
       setMessage(err.response?.data?.message || 'Could not add items to cart.');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const readStep = () => {
+    const text = recipe.steps?.[cookingStep];
+    if (!text || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  };
+
+  const openCookingMode = async () => {
+    setCookingMode(true);
+    try {
+      await navigator.wakeLock?.request?.('screen');
+    } catch {
+      // Wake lock is best-effort; the full-screen cooking view still works.
     }
   };
 
@@ -102,6 +157,27 @@ export default function RecipeResult() {
               <span className="text-sm font-semibold text-[var(--text-primary)]">{selectedMatches.length} Matched</span>
             </div>
           </div>
+
+          {(pantryNote || recipe.nutrition || featureFlags.handsFreeCooking) && (
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-4 shadow-sm">
+              {pantryNote && featureFlags.smartPantry && (
+                <p className="mb-3 text-sm font-semibold text-[#14B8A6]">{pantryNote}</p>
+              )}
+              {recipe.nutrition && featureFlags.nutritionCostCard && (
+                <div className="mb-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                  <span><b>{recipe.nutrition.calories_per_serving}</b> cal/serving</span>
+                  <span><b>{recipe.nutrition.protein_g_per_serving}g</b> protein</span>
+                  <span><b>{formatPrice(recipe.nutrition.estimated_cost)}</b> total</span>
+                  <span><b>{formatPrice(recipe.nutrition.cost_per_serving)}</b> / serving</span>
+                </div>
+              )}
+              {featureFlags.handsFreeCooking && (
+                <button type="button" onClick={openCookingMode} className="flex items-center gap-2 rounded-xl bg-[#111827] px-4 py-2 text-sm font-bold text-white">
+                  <Maximize2 className="h-4 w-4" /> Cooking mode
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="space-y-4">
             <h2 className="text-2xl font-bold tracking-normal text-[var(--text-primary)]">Instructions</h2>
@@ -138,11 +214,11 @@ export default function RecipeResult() {
           <div className="sticky top-24 rounded-3xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-sm">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-normal text-[var(--text-primary)]">Matched Cart</h2>
-              <span className="text-sm font-medium text-[var(--text-secondary)]">{selectedMatches.length}/{matches.length}</span>
+              <span className="text-sm font-medium text-[var(--text-secondary)]">{selectedMatches.length}/{localMatches.length}</span>
             </div>
 
             <div className="mb-6 max-h-[520px] space-y-4 overflow-y-auto pr-1">
-              {matches.map((match) => {
+              {localMatches.map((match, index) => {
                 const product = match.product;
                 const isSelected = product && selected.has(product.id);
 
@@ -178,7 +254,17 @@ export default function RecipeResult() {
                           <p className="mt-1 text-sm font-bold text-[var(--text-primary)]">
                             {match.quantity} x {formatPrice(product.price)}
                           </p>
-                          <p className="mt-1 text-xs text-[var(--text-secondary)]">{match.note}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-xs text-[var(--text-secondary)]">{match.note}</p>
+                            <button
+                              type="button"
+                              onClick={() => openRecipeSwap(match, index)}
+                              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-[#14B8A6] hover:bg-[var(--bg-card)]"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Swap
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -202,6 +288,59 @@ export default function RecipeResult() {
           </div>
         </div>
       </div>
+
+      <SwapSheet
+        isOpen={swapState.isOpen}
+        currentItem={swapState.matchIndex >= 0 ? { product: localMatches[swapState.matchIndex]?.product } : null}
+        options={swapState.options}
+        isLoading={false}
+        isSwapping={false}
+        error=""
+        onClose={() => setSwapState({ isOpen: false, matchIndex: -1, options: [] })}
+        onSelect={applyRecipeSwap}
+      />
+
+      {cookingMode && featureFlags.handsFreeCooking && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-[#0F172A] p-6 text-white"
+          onClick={() => setCookingStep(step => Math.min((recipe.steps?.length || 1) - 1, step + 1))}
+        >
+          <div className="mb-8 flex items-center justify-between">
+            <span className="text-sm font-bold uppercase tracking-normal text-white/60">
+              Step {cookingStep + 1} of {recipe.steps?.length || 1}
+            </span>
+            <div className="flex gap-2">
+              <button type="button" onClick={(event) => { event.stopPropagation(); readStep(); }} className="rounded-full bg-white/10 p-3">
+                <Volume2 className="h-6 w-6" />
+              </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setCookingMode(false); }} className="rounded-full bg-white/10 p-3">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-1 items-center justify-center text-center">
+            <p className="max-w-4xl text-4xl font-black leading-tight tracking-normal md:text-6xl">
+              {recipe.steps?.[cookingStep]}
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setCookingStep(step => Math.max(0, step - 1)); }}
+              className="rounded-xl bg-white/10 px-5 py-3 font-bold"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setCookingStep(step => Math.min((recipe.steps?.length || 1) - 1, step + 1)); }}
+              className="rounded-xl bg-white px-5 py-3 font-bold text-[#0F172A]"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

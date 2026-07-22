@@ -17,6 +17,8 @@ import AdminDashboard from '../pages/admin/Dashboard';
 import ProductManagement from '../pages/admin/ProductManagement';
 import OrderManagement from '../pages/admin/OrderManagement';
 import DarkStoreManagement from '../pages/admin/DarkStoreManagement';
+import WalletCredit from '../pages/admin/WalletCredit';
+import NotificationPreferences from '../pages/NotificationPreferences';
 
 export const router = createBrowserRouter([
   {
@@ -32,7 +34,8 @@ export const router = createBrowserRouter([
       { path: 'checkout', element: <ProtectedRoute><Checkout /></ProtectedRoute> },
       { path: 'orders', element: <ProtectedRoute><OrderHistory /></ProtectedRoute> },
       { path: 'orders/:id', element: <ProtectedRoute><OrderTracking /></ProtectedRoute> },
-      { path: 'wallet', element: <ProtectedRoute><WalletPayments /></ProtectedRoute> }
+      { path: 'wallet', element: <ProtectedRoute><WalletPayments /></ProtectedRoute> },
+      { path: 'notifications', element: <ProtectedRoute><NotificationPreferences /></ProtectedRoute> }
     ]
   },
   {
@@ -46,7 +49,8 @@ export const router = createBrowserRouter([
       { index: true, element: <AdminDashboard /> },
       { path: 'products', element: <ProductManagement /> },
       { path: 'orders', element: <OrderManagement /> },
-      { path: 'stores', element: <DarkStoreManagement /> }
+      { path: 'stores', element: <DarkStoreManagement /> },
+      { path: 'wallet-credit', element: <WalletCredit /> }
     ]
   }
 ]);

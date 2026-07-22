@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
 import Footer from './Footer';
 import CartDrawer from '../common/CartDrawer';
+import VoiceQuickAdd from '../common/VoiceQuickAdd';
 import { useUiStore } from '../../store/uiStore';
 
 export default function AppShell() {
@@ -28,6 +29,7 @@ export default function AppShell() {
 
       <Footer />
       <MobileNav />
+      <VoiceQuickAdd />
     </div>
   );
 }

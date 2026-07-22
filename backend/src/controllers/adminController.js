@@ -128,3 +128,23 @@ export const deleteDarkStore = async (req, res, next) => {
     next(error);
   }
 };
+
+export const creditWallet = async (req, res, next) => {
+  try {
+    const { user_id, amount, note = 'Manual goodwill credit' } = req.body;
+    const numericAmount = Number(amount);
+    if (!Number.isInteger(Number(user_id)) || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'user_id and positive amount are required' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO wallet_transactions (user_id, amount, type, note, metadata)
+       VALUES ($1, $2, 'goodwill_credit', $3, $4)
+       RETURNING *`,
+      [Number(user_id), numericAmount, note, { admin_user_id: req.user.id }]
+    );
+    return res.status(201).json({ transaction: rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+};

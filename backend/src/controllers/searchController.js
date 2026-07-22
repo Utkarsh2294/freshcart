@@ -34,14 +34,23 @@ export const suggest = async (req, res, next) => {
           JOIN categories c ON p.category_id = c.id
           JOIN order_items oi ON p.id = oi.product_id
           JOIN orders o ON oi.order_id = o.id
-          WHERE o.user_id = $1 AND p.name ILIKE $2
+          WHERE o.user_id = $1 AND (p.name ILIKE $2 OR c.name ILIKE $2)
           LIMIT 3
         ),
         general_matches AS (
-          SELECT p.id AS product_id, p.name, c.name AS category, similarity(p.name, $3) AS weight
+          SELECT
+            p.id AS product_id,
+            p.name,
+            c.name AS category,
+            similarity(p.name, $3)
+              + CASE
+                  WHEN LOWER(c.name) = LOWER($3) THEN 3
+                  WHEN c.name ILIKE $2 THEN 2
+                  ELSE 0
+                END AS weight
           FROM products p
           JOIN categories c ON p.category_id = c.id
-          WHERE p.name ILIKE $2 OR similarity(p.name, $3) > 0.2
+          WHERE p.name ILIKE $2 OR c.name ILIKE $2 OR similarity(p.name, $3) > 0.2
           LIMIT 10
         )
         SELECT product_id, name, category, MAX(weight) AS max_weight
@@ -57,10 +66,19 @@ export const suggest = async (req, res, next) => {
       params = [userId, `%${queryText}%`, queryText];
     } else {
       query = `
-        SELECT p.id AS product_id, p.name, c.name AS category, similarity(p.name, $1) AS weight
+        SELECT
+          p.id AS product_id,
+          p.name,
+          c.name AS category,
+          similarity(p.name, $1)
+            + CASE
+                WHEN LOWER(c.name) = LOWER($1) THEN 3
+                WHEN c.name ILIKE $2 THEN 2
+                ELSE 0
+              END AS weight
         FROM products p
         JOIN categories c ON p.category_id = c.id
-        WHERE p.name ILIKE $2 OR similarity(p.name, $1) > 0.2
+        WHERE p.name ILIKE $2 OR c.name ILIKE $2 OR similarity(p.name, $1) > 0.2
         ORDER BY weight DESC, p.name ASC
         LIMIT 6;
       `;

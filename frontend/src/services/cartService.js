@@ -47,3 +47,17 @@ export const removeItem = async (itemId) => {
   const { data } = await api.delete(`/cart/items/${itemId}`);
   return data;
 };
+
+export const getSwapOptions = async (itemId) => {
+  const { data } = await api.get(`/cart/items/${itemId}/swap-options`);
+  return {
+    ...data,
+    item: data.item,
+    options: (data.options || []).map(normalizeProduct),
+  };
+};
+
+export const swapItem = async (itemId, newProductId) => {
+  const { data } = await api.patch(`/cart/items/${itemId}/swap`, { new_product_id: newProductId });
+  return data;
+};

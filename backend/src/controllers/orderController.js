@@ -147,6 +147,10 @@ export const createOrder = async (req, res) => {
         INSERT INTO order_items (order_id, product_id, qty, price_at_purchase)
         VALUES ($1, $2, $3, $4)
       `, [order.id, item.product_id, item.quantity, item.price]);
+      await client.query(`
+        INSERT INTO order_events (user_id, product_id, city, event_type)
+        VALUES ($1, $2, $3, 'ordered')
+      `, [userId, item.product_id, address?.city || 'demo']);
     }
 
     await client.query("UPDATE carts SET status = 'checked_out' WHERE id = $1", [cartId]);

@@ -18,6 +18,8 @@ import referralRoutes from './routes/referral.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import cookThisRoutes from './routes/cookThisRoutes.js';
+import homeRoutes from './routes/home.routes.js';
+import phase8Routes from './routes/phase8.routes.js';
 
 const app = express();
 
@@ -37,7 +39,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/home', homeRoutes);
 app.use('/api', cookThisRoutes);
+app.use('/api/phase8', phase8Routes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api', trackingRoutes); 

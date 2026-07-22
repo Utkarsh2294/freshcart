@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowRight, Loader2, Mic, Sparkles, Type } from 'lucide-react';
+import { ArrowRight, CalendarDays, Loader2, Mic, Sparkles, Type } from 'lucide-react';
 import * as cookThisService from '../services/cookThisService';
+import * as phase8Service from '../services/phase8Service';
+import { featureFlags } from '../utils/featureFlags';
 
 export default function CookThis() {
   const [prompt, setPrompt] = useState('');
   const [servings, setServings] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -19,19 +22,51 @@ export default function CookThis() {
     setError('');
     try {
       const recipe = await cookThisService.generateRecipe(dishName, servings);
-      const { matches } = await cookThisService.matchIngredients(recipe.ingredients || []);
+      const { matches, pantry_note, nutrition } = await cookThisService.matchIngredients(recipe.ingredients || [], servings);
       navigate('/recipe-result', {
         state: {
           dishName,
           servings,
-          recipe,
+          recipe: { ...recipe, nutrition },
           matches,
+          pantryNote: pantry_note,
         },
       });
     } catch (err) {
       setError(err.response?.data?.message || "Couldn't prepare that recipe. Try a simpler dish name.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleMealPlan = async () => {
+    setIsPlanning(true);
+    setError('');
+    try {
+      const data = await phase8Service.planWeeklyMeals({
+        preferences: {
+          veg_non_veg: 'any',
+          cuisine_tags: prompt.trim() ? [prompt.trim()] : [],
+        },
+        days: 7,
+      });
+      navigate('/recipe-result', {
+        state: {
+          dishName: 'Weekly meal plan',
+          servings: 14,
+          recipe: {
+            title: '7-day Freshcart meal plan',
+            steps: (data.recipes || []).map(recipe => `Day ${recipe.day}: ${recipe.title}`),
+            ingredients: data.consolidated_ingredients || [],
+          },
+          matches: data.matches || [],
+          pantryNote: data.pantry_note,
+        },
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || "Couldn't build the weekly plan.");
+    } finally {
+      setIsPlanning(false);
     }
   };
 
@@ -131,6 +166,18 @@ export default function CookThis() {
           </p>
         )}
       </form>
+
+      {featureFlags.weeklyMealPlanner && (
+        <button
+          type="button"
+          onClick={handleMealPlan}
+          disabled={isPlanning}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] px-5 py-3 font-bold text-[var(--text-primary)] shadow-sm disabled:opacity-60"
+        >
+          {isPlanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <CalendarDays className="h-5 w-5 text-[#14B8A6]" />}
+          Build 7-day meal cart
+        </button>
+      )}
     </div>
   );
 }
