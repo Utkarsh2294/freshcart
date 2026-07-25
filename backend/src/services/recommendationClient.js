@@ -6,6 +6,7 @@
  * Falls back gracefully if the service is unreachable — homeController uses the
  * local temporal fallback in that case (same pattern as Pramarsha).
  */
+import { URL } from 'url';
 
 const RECOMMENDATION_SERVICE_URL = process.env.RECOMMENDATION_SERVICE_URL || 'http://localhost:8001';
 const TIMEOUT_MS = 500;
