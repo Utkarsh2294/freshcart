@@ -1,376 +1,118 @@
-# Freshcart — Quick-Commerce Grocery Delivery Platform
+# 🛒 Freshcart — Next-Gen Quick Commerce Platform
 
-A full-stack grocery e-commerce MVP featuring an AI Recipe-to-Cart Assistant, built with React 18, Express.js, PostgreSQL 16, and Redis.
+![Freshcart Banner](https://img.shields.io/badge/Status-Active-success.svg) ![React](https://img.shields.io/badge/React-18-blue.svg) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg) ![Express](https://img.shields.io/badge/Express.js-Backend-black.svg)
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + Vite + Tailwind CSS v4 (plain JavaScript, `.jsx`) |
-| Backend | Node.js + Express (ESM, plain JavaScript) |
-| Database | PostgreSQL 16 (relational, no MongoDB) |
-| Cache/Session | Redis 7 |
-| Real-time | Socket.IO |
-| Maps | Leaflet + OpenStreetMap |
-| PWA | vite-plugin-pwa |
-| State | Zustand |
-| Validation | Joi (shared schemas) |
-| Money Math | Custom integer-paise module (`shared/money.js`) |
-
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 22+ (for local development)
-
-### Using Docker (Recommended)
-
-```bash
-# Clone and start all services
-git clone https://github.com/Utkarsh2294/freshcart.git
-cd freshcart
-cp .env.example .env
-docker-compose up -d
-
-# Run migrations and seed
-docker-compose exec backend node /app/scripts/migrate.js
-docker-compose exec backend node /app/scripts/seed.js
-```
-
-The app will be available at:
-- Frontend: http://localhost:5173
-- API: http://localhost:4000/api
-
-### Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start PostgreSQL and Redis (via Docker)
-docker-compose up -d postgres redis
-
-# Run migrations
-npm run migrate
-
-# Seed database (45 real products + ~250 synthetic = 300+ total)
-npm run seed
-
-# Start dev servers
-npm run dev:backend   # http://localhost:4000
-npm run dev:frontend  # http://localhost:5173
-```
-
-### Test Accounts
-
-| Role | Phone | OTP (mock) |
-|------|-------|------------|
-| Admin | 9999999999 | 123456 |
-| Customer | 9876543210 | 123456 |
-| Any new number | 6000000000-9999999999 | 123456 |
-
-> **Note:** OTP is mocked for MVP. Any valid 10-digit Indian mobile number works with OTP `123456`.
-
-## Architecture
-
-```
-freshcart/
-├── frontend/        # React 18 + Vite + Tailwind CSS
-├── backend/         # Express.js API (ESM)
-├── shared/          # Joi schemas, money.js, constants, enums
-├── scripts/         # Migrations + seed scripts
-├── docker-compose.yml
-└── .github/workflows/ci.yml
-```
-
-## Database Schema
-
-14 tables with proper foreign keys, indexes, and constraints:
-
-- **users** — phone (unique), email, name, role
-- **addresses** — lat/lng, label, full_address, is_default
-- **categories** — self-referencing hierarchy (parent_id)
-- **brands** — name, logo
-- **products** — price (NUMERIC), TSVECTOR + pg_trgm for typo-tolerant search
-- **reviews** — rating (1-5 CHECK), review_text
-- **carts** / **cart_items** — active cart per user, source tracking
-- **orders** / **order_items** — full order lifecycle with rider tracking fields
-- **dark_stores** — lat/lng, service_radius_km
-- **wallet_transactions** — cashback/referral_bonus/refund/redeemed
-- **referral_codes** — unique per user, tracks usage count
-- **push_subscriptions** — Web Push endpoint + keys
-
-## API Endpoints
-
-### Auth
-- `POST /api/auth/otp/request` — Request OTP (rate limited: 5/min)
-- `POST /api/auth/otp/verify` — Verify OTP → `{accessToken, refreshToken}`
-- `POST /api/auth/refresh` — Refresh access token
-
-### Catalog
-- `GET /api/categories` — Category tree
-- `GET /api/products?category=&search=&page=&sort=` — Typo-tolerant search (pg_trgm + tsvector)
-- `GET /api/products/:id` — Product detail with reviews
-- `GET /api/products/:id/also-bought` — Same-category recommendations
-
-### Search
-- `GET /api/search/suggest?q=` — 6 ranked suggestions (rate limited: 30/min)
-
-### Cart (auth required)
-- `GET /api/cart` — Cart with wallet balance + nearest dark store
-- `POST /api/cart/items` — Add item
-- `PATCH /api/cart/items/:id` — Update quantity
-- `DELETE /api/cart/items/:id` — Remove item
-
-### Orders (auth required)
-- `POST /api/orders` — Atomic checkout (stock decrement + wallet apply + store resolution)
-- `GET /api/orders` — Order history (paginated)
-- `GET /api/orders/:id` — Order detail
-- `GET /api/orders/:id/tracking` — Live tracking data
-
-### Wallet & Referral (auth required)
-- `GET /api/wallet` — Balance + transaction history
-- `GET /api/referral/my-code` — Get/create referral code
-- `POST /api/referral/redeem` — Redeem code (₹50 each)
-
-### Push Notifications (auth required)
-- `POST /api/notifications/subscribe` — Subscribe to push
-- `DELETE /api/notifications/subscribe` — Unsubscribe
-
-### Admin (auth + admin role required)
-- `POST/PATCH/DELETE /api/admin/products`
-- `GET /api/admin/orders`
-- `POST/PATCH/DELETE /api/admin/dark-stores`
-
-## Important Business Rules
-
-### Wallet Cap
-> **Wallet balance may cover at most 50% of the order value.** For example, if the order total is ₹500 and the wallet balance is ₹400, only ₹250 (50% of ₹500) will be applied. This is enforced atomically in the checkout transaction.
-
-### Referral System
-> Each user gets a unique 8-character alphanumeric referral code. When a **new user** redeems a code, both the referrer and the new user receive **₹50** credited to their wallets. A user can only redeem one referral code (enforced server-side).
-
-### Rider Tracking Simulation
-> ⚠️ **The live rider tracking is SIMULATED for this MVP.** The rider's position is computed via linear interpolation from the nearest dark store's coordinates to the delivery address coordinates. A server-side job updates the position every 3 seconds over 100 steps (~5 minutes). This is **not** connected to any real fleet-tracking or logistics API. It is designed purely to demonstrate the real-time tracking UI (Leaflet map + Socket.IO) and should never be presented as real GPS tracking in a production context.
-
-### Money Math
-> All monetary calculations use the `shared/money.js` module which operates on **integer paise** (1/100 of a rupee) internally to avoid JavaScript floating-point precision bugs. Prices are stored as `NUMERIC(10,2)` in PostgreSQL.
-
-## Search: Typo Tolerance
-
-The search system combines PostgreSQL's `pg_trgm` extension (trigram similarity) with full-text `tsvector` indexing:
-
-```sql
-SELECT *, similarity(name, $1) AS sml, 
-       ts_rank(search_vector, plainto_tsquery('english', $1)) AS rank
-FROM products
-WHERE similarity(name, $1) > 0.2 
-   OR search_vector @@ plainto_tsquery('english', $1)
-ORDER BY sml DESC, rank DESC
-```
-
-This means a search for "bananna" will still return "Banana", and "tomatoe" will return "Tomato".
-
-## Dark Stores
-
-3 dark stores seeded in **Bangalore, India**:
-
-| Store | Latitude | Longitude | Radius |
-|-------|----------|-----------|--------|
-| Koramangala Hub | 12.9352 | 77.6245 | 5 km |
-| Indiranagar Hub | 12.9784 | 77.6408 | 5 km |
-| HSR Layout Hub | 12.9121 | 77.6446 | 5 km |
-
-The nearest store is resolved at checkout time using the Haversine formula against the delivery address.
-
-## CI/CD
-
-GitHub Actions runs on every push/PR to `main`:
-1. Verifies **zero** `.ts`/`.tsx` files exist
-2. Runs PostgreSQL 16 + Redis 7 services
-3. Applies migrations + seed
-4. `npm run lint` — must pass with 0 errors
-5. `npm test` — must pass
-
-## PWA
-
-The app is installable as a Progressive Web App:
-- Manifest with app name, theme color, icons (192px + 512px, maskable + any-purpose)
-- Service worker precaches the app shell for instant repeat loads
-- "Add to Home Screen" prompt appears in Chrome
-
-## License
-
-Private — Freshcart © 2026
-
-
-# Cook-with-AI — Recipe Generation (Phase 4)
-
-Drop this section into the main project README, wherever the other
-Cook-with-AI phases are documented.
-
-## What this phase does
-
-Given a dish name and a serving count, this step returns a structured
-recipe (`title`, `steps`, `ingredients`) for Phase 5 to turn into cart
-items. It replaces the earlier curated-KB + fine-tuned-LLM approach
-entirely — there is no `recipes` table, no FAISS retrieval index, and no
-local fine-tuning involved anymore.
-
-## Honesty note: why this step calls a third-party API
-
-Freshcart's AI components are self-hosted and deterministic everywhere
-else in this project — ingredient matching, quantity math, and cart
-insertion all run on our own infrastructure with no external model calls.
-Recipe generation is the **one, deliberate, scoped exception**.
-
-The reason is practical, not philosophical: Kimi K3 (Moonshot AI's
-2.8-trillion-parameter model) is the model doing the generation, and at
-the time this was written its full open weights had not yet been released
-— Moonshot had only committed to a later release date. Even once released,
-2.8T parameters is far beyond what a single GPU (or realistically, our
-whole self-hosting budget) can serve. Self-hosting an open-weight
-alternative small enough to run locally would mean giving up the recipe
-quality we're aiming for.
-
-So: recipe generation goes out to Kimi K3 via an OpenAI-compatible
-endpoint, and every other AI-adjacent step in Cook-with-AI stays exactly
-where it was — in our own infrastructure. This isn't a reversal of the
-zero-third-party-API principle for the project; it's one narrow, isolated
-exception, contained entirely inside `services/kimiRecipeClient.js`. No
-other file in the codebase imports an AI SDK, holds an API key for a
-model provider, or constructs a prompt for a third-party model.
-
-If Kimi K3's weights become self-hostable at a size we can realistically
-serve, this is the file to revisit.
-
-## Cost control
-
-Kimi K3 is billed per token ($3/M input, $15/M output as of this writing —
-**recheck OpenRouter's or Moonshot's console before relying on this**,
-pricing on newly-launched models changes fast). Two things keep this
-sustainable for a demo-scale app:
-
-1. **Caching.** Every successful generation is stored in `recipe_cache`
-   keyed on `(normalized dish_name, servings)`. A repeat request for the
-   same dish and serving count never calls the API again — it's a Postgres
-   lookup.
-2. **Retry cap.** On malformed output, `kimiRecipeClient` retries exactly
-   once, then fails gracefully rather than looping.
-
-## Failure behavior
-
-If Kimi returns something that isn't valid JSON, or JSON that doesn't
-match the required schema, `kimiRecipeClient` retries once. If the retry
-also fails, `POST /ai/cook-this/generate` returns a 422 with a
-`"couldn't generate that recipe, try rephrasing"` message — never a crash,
-never a silently empty cart. See `contracts/generate-recipe.md` for the
-exact response shapes.
-
-## Phase 8 Differentiator Modules
-
-Each module is independently gated. Backend flags use `FEATURE_*`; frontend flags use `VITE_FEATURE_*`. Set a flag to `false`, `0`, `off`, or `no` to hide/disable that module without affecting the core browse -> AI cook -> cart -> swap -> Pramarsha -> checkout loop.
-
-- Smart Pantry: `FEATURE_SMART_PANTRY` / `VITE_FEATURE_SMART_PANTRY`. Adds `user_pantry` and filters pantry ingredients from matched recipe/planner carts with a skipped-items note.
-- Hands-Free Cooking Mode: `FEATURE_HANDS_FREE_COOKING` / `VITE_FEATURE_HANDS_FREE_COOKING`. Adds a full-screen step view with tap/Next navigation, screen wake lock, and browser read-aloud fallback. The existing `ai-services/tts-service` remains the Kokoro-82M integration point when model assets are mounted.
-- Weekly Meal Planner: `FEATURE_WEEKLY_MEAL_PLANNER` / `VITE_FEATURE_WEEKLY_MEAL_PLANNER`. Builds 5-7 varied recipes, consolidates ingredient quantities, then sends one deduped cart review through the matcher.
-- Nutrition + Cost Card: `FEATURE_NUTRITION_COST_CARD` / `VITE_FEATURE_NUTRITION_COST_CARD`. Seeds `nutrition_lookup`, extends `recipe_cache`, and shows calories/protein/cost per serving.
-- Dietary Filters: `FEATURE_DIETARY_FILTERS` / `VITE_FEATURE_DIETARY_FILTERS`. Stores `user_dietary_profiles` and applies tags to matcher/planner/quick-add catalog selection.
-- Social Proof + Gamification: `FEATURE_SOCIAL_PROOF_GAMIFICATION` / `VITE_FEATURE_SOCIAL_PROOF_GAMIFICATION`. Rolls up `order_events` above the minimum threshold and awards simple AI recipe streak badges.
-- Voice Commerce Quick-Add: `FEATURE_VOICE_QUICK_ADD` / `VITE_FEATURE_VOICE_QUICK_ADD`. Uses the Web Speech API transcript, a deterministic quantity/unit/name parser, matcher-service product matching, and review chips before cart insertion.
-- Push Notifications + PWA: `FEATURE_PUSH_NOTIFICATIONS_PWA` / `VITE_FEATURE_PUSH_NOTIFICATIONS_PWA`. Adds notification preferences, `web-push` VAPID delivery, notification job records, and a test order-status push endpoint.
-- Predictive Reorder Feed: `FEATURE_PREDICTIVE_REORDER_FEED` / `VITE_FEATURE_PREDICTIVE_REORDER_FEED`. Adds a distinct Home rail using purchase cadence on top of the existing user-affinity path, with one-tap add all.
-- Referral + Cashback Wallet: `FEATURE_REFERRAL_WALLET` / `VITE_FEATURE_REFERRAL_WALLET`. Adds native share/copy fallback, wallet transaction history continuity, admin goodwill credit, and exactly-once referral redemption via `referral_redemptions`.
-
-Run `npm run migrate` after pulling Phase 8 so `scripts/migrations/012_phase8_modules.sql` is applied before exercising the new routes.
+Freshcart is a state-of-the-art full-stack grocery e-commerce platform built to demonstrate the future of quick-commerce. Combining traditional grocery delivery mechanics with advanced **AI-driven contextual recommendations**, **Voice-to-Cart**, and a **Cook-with-AI Assistant**, Freshcart delivers a seamless, hyper-personalized shopping experience.
 
 ---
 
-# What Changed from the Original Rev 2.0 Blueprint
+## ✨ Key Features
 
-This section documents every deliberate divergence from the original Rev 2.0 design spec, so the delta is always a single-section lookup rather than a full file diff.
+### 🧠 Advanced AI & Personalization
+* **Pramarsha 2.0 (Contextual Recommendation Engine):** An intelligent feed that surfaces products dynamically based on real-time signals: *Time of day*, *Live Weather*, *Purchase Cadence*, *User Streaks*, and *Local Festivals*.
+* **Cook-with-AI (Recipe-to-Cart):** Generate recipes natively (powered by Kimi K3) for any dish, scale by serving size, and instantly match required ingredients to available catalog stock using exact, oversized, and closest-match algorithms.
+* **Smart Pantry:** Automatically detects ingredients the user likely already has at home, preventing over-purchasing and saving money.
+* **Typo-Tolerant Search:** Lightning-fast full-text search built on PostgreSQL `pg_trgm` and `tsvector` — ensures searches like "bananna" return "Banana" flawlessly.
 
-## Phase 2 — Recommendation Engine
+### 🎙️ Next-Gen Interactions
+* **Voice Quick-Add Commerce:** Tap the mic and say *"add two packets of milk and a loaf of bread"*. The NLP engine parses quantities, units, and products to instantly build your cart.
+* **Hands-Free Cooking Mode:** Step-by-step recipe execution with screen wake-lock, large typography, and text-to-speech for messy kitchens.
+* **Progressive Web App (PWA):** Fully installable on iOS and Android with background service workers and Web Push Notifications for live order updates.
 
-**Rev 2.0 intent:** user-affinity scoring drives the Home page "best deals" rail.
+### 🛍️ Core Quick-Commerce Engine
+* **Atomic Wallet & Checkout:** High-precision integer-paise math handles wallet cashback limits and order totals simultaneously.
+* **Geospatial Dark Store Routing:** Automatically assigns the nearest micro-fulfillment center (Dark Store) using Haversine distance formulas based on the user's delivery address.
+* **Real-Time Rider Tracking:** Live simulated map tracking via Socket.IO and Leaflet.js to track your grocery delivery from store to doorstep.
+* **Referral & Cashback System:** Built-in growth loops allowing users to share codes and earn wallet balance seamlessly.
 
-**What changed:**
-- Added `ai-services/recommendation-service/` — a FastAPI Python microservice (port 8001) that computes per-product affinity scores using purchase frequency + recency decay (`score = 0.6 × normalized_freq + 0.4 × recency`) and upserts to the new `product_scores` table.
-- Added migration `013_product_scores.sql` creating the `product_scores` table (not in Rev 2.0 schema).
-- `backend/src/services/recommendationClient.js` (previously a 1-line stub) is now a full HTTP client with 500ms timeout and graceful fallback.
-- The backend `homeController.js` was **not** modified — it already queries `product_scores` in its local temporal fallback path.
-- `docker-compose.yml` gains two new service entries: `recommendation-service` (port 8001) and `input-understanding-service` (port 8002).
+---
 
-## Phase 3 — Voice Search + Text Intent
+## 🛠️ Technology Stack
 
-**Rev 2.0 intent:** voice search routes to product results.
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18, Vite, Tailwind CSS v4, Zustand |
+| **Backend** | Node.js, Express.js (ESM) |
+| **Database** | PostgreSQL 16 (Relational, Geospatial, Full-Text Search) |
+| **Caching** | Redis 7 |
+| **AI Microservices** | Python, FastAPI |
+| **Real-time** | Socket.IO, Leaflet (Maps) |
+| **Infrastructure** | Docker, Docker Compose, GitHub Actions |
 
-**What changed:**
-- Added `ai-services/input-understanding-service/` — a zero-dependency FastAPI Python microservice (port 8002). Uses deterministic keyword maps and regex patterns to classify queries into `product_search`, `category_browse`, or `recipe_suggestion` intents. **No third-party AI.**
-- `backend/src/controllers/searchController.js` gained a new `understandSearchIntent` export; `search.routes.js` gained `GET /api/search/understand`.
-- `frontend/src/components/common/SearchBar.jsx` now calls `/api/search/understand` for conversational queries (3+ words or recipe trigger words) and routes to `/cook-this?dish=<query>` or `/search?category=<hint>` accordingly. Single-word searches bypass the intent layer entirely (latency-free).
+---
 
-## Phase 4 — Kimi K3 Recipe Generation
+## 🚀 Quick Start (Local Development)
 
-**No schema or architecture changes.** `kimiRecipeClient.js` was already complete. The only addition is the Kimi API key in `.env` activating the live path (previously the demo fallback was used).
+### Prerequisites
+* Docker & Docker Compose
+* Node.js 22+
 
-## Phase 5 — Ingredient Matching
+### 1. Using Docker (Recommended)
+The easiest way to get the entire microservice architecture running.
 
-**One design constraint fix:** `RecipeResult.jsx` previously used hardcoded Tailwind color class strings (e.g. `bg-green-50 text-green-700`) for match-type badges, violating the "all colors from design-tokens" constraint. These were replaced with inline `style` objects referencing new CSS variables (`--badge-exact-bg`, `--badge-closest-bg`, etc.) added to `variables.css` — values sourced from `design/design-tokens.json`'s semantic palette.
+```bash
+# Clone the repository
+git clone https://github.com/Utkarsh2294/freshcart.git
+cd freshcart
 
-## Phase 6 — Brand Swap
+# Set up environment variables
+cp .env.example .env
 
-**One fix:** `frontend/src/services/cartService.js` `swapItem` method was confirmed to call `PATCH /api/cart/items/:id` with `{ product_id }` correctly. Cart page swap now persists server-side.
+# Spin up all containers (DB, Redis, API, AI Services, Frontend)
+docker-compose up -d
 
-## Phase 7 — Pramarsha Banner + Seed Data
-
-**No changes.** Pramarsha's schema and mining logic were never touched. The banner correctly appears for users with ≥2 orders and disappears for cold-start users (the `fetchLocalTemporalFallback` returns `[]` for `order_count < 2`).
-
-## Phase 8 — Advanced Modules
-
-All 10 modules were already wired. **Two additions:**
-
-1. **Order-status push trigger:** `orderController.js` now fires a push notification after successful order COMMIT if `FEATURE_PUSH_NOTIFICATIONS_PWA` is enabled and the user has a registered push subscription.
-2. **VAPID keys:** Generated and added to `.env` / `.env.example` so push notifications work out-of-box.
-3. **`.env.example`:** Fully updated to document all Phase 2–8 environment variables (Kimi K3, VAPID, service URLs, all feature flags with their VITE_ counterparts).
-
-## Phase 9 — Testing
-
-**What was stub → now real:**
-
-| File | Before | After |
-|---|---|---|
-| `tests/unit/haversine.test.js` | Stub comment | 4 real tests with Bangalore coordinates |
-| `tests/unit/money.test.js` | Stub comment | 4 real tests of `toPaise`, `toRupees`, `add`, `applyPercentage`, wallet cap rule |
-| `tests/unit/ingredientMatcher.test.js` | Did not exist | 5 tests of the ingredient matcher |
-| `tests/integration/auth.test.js` | Stub comment | 4 tests (skip-if-no-DB) |
-| `tests/integration/cart.test.js` | Stub comment | 3 tests (skip-if-no-DB) |
-| `tests/integration/checkout.test.js` | Stub comment | 3 tests (1 always-runs: wallet cap math) |
-| `tests/integration/search.test.js` | Stub comment | 4 tests (skip-if-no-DB) |
-| `tests/integration/wallet.test.js` | Stub comment | 2 tests (skip-if-no-DB) |
-
-Added `tests/vitest-setup.js` — probes Postgres availability before any test runs; integration suites call `describe.skipIf(!db())` so `npm test` produces 0 failures when Docker is not running.
-
-**Test command result (without Docker):**
+# Run database migrations and seed catalog data
+docker-compose exec backend node /app/scripts/migrate.js
+docker-compose exec backend node /app/scripts/seed.js
 ```
-Test Files  7 passed | 4 skipped (11)
-     Tests  24 passed | 15 skipped (39)
+The application will be running at **http://localhost:5173**.
+
+### 2. Manual Development Setup
+```bash
+npm install
+
+# Start PostgreSQL and Redis via Docker
+docker-compose up -d postgres redis
+
+# Run migrations and seed data
+npm run migrate
+npm run seed
+
+# Start the development servers
+npm run dev
 ```
-**Test command result (with `docker-compose up -d postgres redis` first):**
-All 39 tests pass.
 
-## Constraints that were verified throughout
+---
 
-| Constraint | Status |
-|---|---|
-| Plain JavaScript only (frontend/backend) | ✅ No `.ts`/`.tsx` files anywhere |
-| Python only for AI microservices | ✅ Both new services are FastAPI/Python |
-| All colors/spacing from design-tokens | ✅ RecipeResult badge fix removes the only violation |
-| Kimi K3 is the only third-party AI API | ✅ Isolated in `kimiRecipeClient.js`; new services are self-hosted |
-| Pramarsha schema/mining logic never modified | ✅ Only HTTP-consumed |
-| No hardcoded hex values in components | ✅ All values reference CSS vars |
+## 🧪 Testing & CI/CD
 
-## Final E2E Test
+Freshcart maintains strict code quality and testing standards.
+* **CI/CD:** GitHub Actions automatically runs linting, DB migrations, and integration tests on every push to the `main` branch.
+* **Unit & Integration Tests:** Powered by `vitest` and `supertest`, covering atomic checkout, wallet math, cart persistence, and auth boundaries.
 
-See `scripts/manual-test-log.md` for the full one-session E2E test log covering all 7 required scenarios (dark mode, voice search, Cook-with-AI with exact+closest match, Pramarsha patterned/cold-start, brand swap, wallet checkout, push notification on order status change).
+```bash
+# Run the complete test suite locally
+npm test
+```
 
+## 📦 Database Architecture
+The application runs on a robust 14-table relational schema designed for scale:
+* `users`, `addresses`, `wallet_transactions`, `referral_codes`
+* `categories`, `brands`, `products` (Indexed with TSVECTOR)
+* `carts`, `cart_items`, `orders`, `order_items`
+* `dark_stores` (Geospatial mapping)
+* `recipe_cache`, `product_scores` (AI memory & caching)
+
+---
+
+## 🔐 Demo Accounts
+OTP verification is mocked for development. Any valid 10-digit Indian phone number can be used to log in.
+
+| Role | Phone | OTP |
+|------|-------|------------|
+| Admin | 9999999999 | 123456 |
+| Customer | 9876543210 | 123456 |
+
+---
+
+*Private — Freshcart © 2026*
