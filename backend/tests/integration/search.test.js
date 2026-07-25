@@ -8,19 +8,19 @@ describe.skipIf(!db())('Search API', () => {
   it('GET /api/products — returns array', async () => {
     const res = await request(app).get('/api/products');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('GET /api/products?search=milk — returns results', async () => {
     const res = await request(app).get('/api/products?search=milk');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('GET /api/products?search=bananna — typo tolerance returns array', async () => {
     const res = await request(app).get('/api/products?search=bananna');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
     // pg_trgm typo tolerance: may return results for banana, always returns an array
   });
 

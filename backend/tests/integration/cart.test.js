@@ -27,8 +27,9 @@ describe.skipIf(!db())('Cart API', () => {
       .get('/api/cart')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('items');
-    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body).toHaveProperty('cart');
+    expect(res.body.cart).toHaveProperty('items');
+    expect(Array.isArray(res.body.cart.items)).toBe(true);
   });
 
   it('POST /api/cart/items — rejects missing product_id', async () => {
