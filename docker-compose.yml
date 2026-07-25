@@ -73,6 +73,32 @@ services:
     volumes:
       - ./frontend/src:/app/frontend/src
 
+  # Phase 2 — Recommendation Engine (self-hosted, no third-party AI)
+  recommendation-service:
+    build:
+      context: ./ai-services/recommendation-service
+      dockerfile: Dockerfile
+    container_name: freshcart-recommendation
+    restart: unless-stopped
+    ports:
+      - '8001:8001'
+    environment:
+      DATABASE_URL: postgresql://freshcart:freshcart_pass@postgres:5432/freshcart
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Phase 3 — Input Understanding Service (deterministic rule-based, no third-party AI)
+  input-understanding-service:
+    build:
+      context: ./ai-services/input-understanding-service
+      dockerfile: Dockerfile
+    container_name: freshcart-input-understanding
+    restart: unless-stopped
+    ports:
+      - '8002:8002'
+
 volumes:
   pgdata:
   redisdata:
+

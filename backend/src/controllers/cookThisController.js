@@ -35,6 +35,7 @@ const matchRequestSchema = Joi.object({
     qty: Joi.number().positive().required(),
     unit: Joi.string().allow('', null).default(null),
   })).min(1).required(),
+  servings: Joi.number().integer().min(1).max(50).optional(),
 }).required();
 
 const addMatchedItemsSchema = Joi.object({
@@ -111,6 +112,7 @@ async function generateRecipeHandler(req, res) {
     });
   } catch (err) {
     if (err instanceof RecipeGenerationError) {
+      console.error('[POST /ai/cook-this/generate] Graceful failure cause:', err.cause || err.message);
       // Graceful failure state — never a silent crash, never an empty cart.
       return res.status(422).json({
         success: false,
@@ -169,7 +171,7 @@ async function matchIngredientsHandler(req, res, next) {
       ? await filterMatchesWithPantry(req.user.id, matches)
       : { matches, pantry_note: '', skipped: [] };
     const nutrition = featureFlags.nutritionCostCard
-      ? await computeNutritionAndCost(value.ingredients, pantryResult.matches, Number(req.body.servings || 1))
+      ? await computeNutritionAndCost(value.ingredients, pantryResult.matches, Number(value.servings || 1))
       : null;
 
     return res.json({

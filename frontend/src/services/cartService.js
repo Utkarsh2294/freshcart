@@ -58,6 +58,6 @@ export const getSwapOptions = async (itemId) => {
 };
 
 export const swapItem = async (itemId, newProductId) => {
-  const { data } = await api.patch(`/cart/items/${itemId}/swap`, { new_product_id: newProductId });
+  const { data } = await api.patch(`/cart/items/${itemId}`, { product_id: newProductId });
   return data;
 };

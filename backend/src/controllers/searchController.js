@@ -95,3 +95,35 @@ export const suggest = async (req, res, next) => {
     next(error);
   }
 };
+
+export const understandSearchIntent = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || typeof q !== 'string' || q.trim() === '') {
+      return res.status(400).json({ error: 'Valid query is required' });
+    }
+    
+    const INPUT_UNDERSTANDING_SERVICE_URL = process.env.INPUT_UNDERSTANDING_SERVICE_URL || 'http://localhost:8002';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1000);
+    try {
+      const response = await fetch(`${INPUT_UNDERSTANDING_SERVICE_URL}/understand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+        signal: controller.signal
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return res.json(data);
+      }
+    } catch (e) {
+      // Ignore and fallback
+    } finally {
+      clearTimeout(timeout);
+    }
+    return res.json({ intent: 'product_search', query: q, category_hint: null });
+  } catch (error) {
+    next(error);
+  }
+};

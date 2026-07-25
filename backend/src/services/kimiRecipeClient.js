@@ -137,7 +137,7 @@ async function callKimi(messages) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${KIMI_API_KEY}`,
+        Authorization: `Bearer ${String(KIMI_API_KEY).trim()}`,
       },
       body: JSON.stringify({
         model: KIMI_MODEL,

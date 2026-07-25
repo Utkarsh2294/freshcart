@@ -104,6 +104,18 @@
   --z-nav:      100;
   --z-modal:    200;
   --z-toast:    300;
+
+  /* ── Match Badge Colors (from design-tokens semantic palette) ────── */
+  --badge-exact-bg:       #E8F8F0;
+  --badge-exact-text:     #1A7A4A;
+  --badge-multi-bg:       #EFF6FF;
+  --badge-multi-text:     #2563EB;
+  --badge-oversized-bg:   #FFFBEB;
+  --badge-oversized-text: #D97706;
+  --badge-closest-bg:     #F3F4F6;
+  --badge-closest-text:   #4B5563;
+  --badge-nomatch-bg:     #FFF5F5;
+  --badge-nomatch-text:   #E53E3E;
 }
 
 /* ── Dark Mode Overrides ──────────────────────── */
@@ -124,4 +136,16 @@
   --shadow-sm:    0 4px 12px rgba(0,0,0,0.4);
   --shadow-md:    0 12px 32px rgba(0,0,0,0.5);
   --shadow-lg:    0 24px 64px rgba(0,0,0,0.6);
+
+  /* ── Match Badge Colors — Dark ────────────────────────────────────── */
+  --badge-exact-bg:       rgba(26, 122, 74, 0.15);
+  --badge-exact-text:     #2ECC77;
+  --badge-multi-bg:       rgba(37, 99, 235, 0.15);
+  --badge-multi-text:     #60A5FA;
+  --badge-oversized-bg:   rgba(217, 119, 6, 0.15);
+  --badge-oversized-text: #F59E0B;
+  --badge-closest-bg:     rgba(55, 65, 81, 0.3);
+  --badge-closest-text:   #9CA3AF;
+  --badge-nomatch-bg:     rgba(229, 62, 62, 0.15);
+  --badge-nomatch-text:   #FC8181;
 }

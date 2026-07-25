@@ -3,6 +3,18 @@ import { Mic, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useSearch } from '../../hooks/useSearch';
 
+const INPUT_UNDERSTANDING_ENABLED = true; // falls back gracefully if service down
+
+async function understandIntent(query) {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/search/understand?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default function SearchBar() {
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') || '');
@@ -27,9 +39,26 @@ export default function SearchBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const submitSearch = (value) => {
+  const submitSearch = async (value) => {
     const trimmed = value.trim();
     if (!trimmed) return;
+
+    // Only attempt intent understanding for conversational queries (3+ words or recipe triggers)
+    const isConversational = trimmed.split(' ').length >= 3 || /\b(cook|make|recipe|prepare|bake)\b/i.test(trimmed);
+    if (INPUT_UNDERSTANDING_ENABLED && isConversational) {
+      const intent = await understandIntent(trimmed);
+      if (intent?.intent === 'recipe_suggestion' && intent.query) {
+        navigate(`/cook-this?dish=${encodeURIComponent(intent.query)}`);
+        setIsOpen(false);
+        return;
+      }
+      if (intent?.intent === 'category_browse' && intent.category_hint) {
+        navigate(`/search?category=${encodeURIComponent(intent.category_hint)}`);
+        setIsOpen(false);
+        return;
+      }
+    }
+
     navigate(`/search?q=${encodeURIComponent(trimmed)}`);
     setIsOpen(false);
   };

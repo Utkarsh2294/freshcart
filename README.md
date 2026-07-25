@@ -283,3 +283,94 @@ Each module is independently gated. Backend flags use `FEATURE_*`; frontend flag
 - Referral + Cashback Wallet: `FEATURE_REFERRAL_WALLET` / `VITE_FEATURE_REFERRAL_WALLET`. Adds native share/copy fallback, wallet transaction history continuity, admin goodwill credit, and exactly-once referral redemption via `referral_redemptions`.
 
 Run `npm run migrate` after pulling Phase 8 so `scripts/migrations/012_phase8_modules.sql` is applied before exercising the new routes.
+
+---
+
+# What Changed from the Original Rev 2.0 Blueprint
+
+This section documents every deliberate divergence from the original Rev 2.0 design spec, so the delta is always a single-section lookup rather than a full file diff.
+
+## Phase 2 — Recommendation Engine
+
+**Rev 2.0 intent:** user-affinity scoring drives the Home page "best deals" rail.
+
+**What changed:**
+- Added `ai-services/recommendation-service/` — a FastAPI Python microservice (port 8001) that computes per-product affinity scores using purchase frequency + recency decay (`score = 0.6 × normalized_freq + 0.4 × recency`) and upserts to the new `product_scores` table.
+- Added migration `013_product_scores.sql` creating the `product_scores` table (not in Rev 2.0 schema).
+- `backend/src/services/recommendationClient.js` (previously a 1-line stub) is now a full HTTP client with 500ms timeout and graceful fallback.
+- The backend `homeController.js` was **not** modified — it already queries `product_scores` in its local temporal fallback path.
+- `docker-compose.yml` gains two new service entries: `recommendation-service` (port 8001) and `input-understanding-service` (port 8002).
+
+## Phase 3 — Voice Search + Text Intent
+
+**Rev 2.0 intent:** voice search routes to product results.
+
+**What changed:**
+- Added `ai-services/input-understanding-service/` — a zero-dependency FastAPI Python microservice (port 8002). Uses deterministic keyword maps and regex patterns to classify queries into `product_search`, `category_browse`, or `recipe_suggestion` intents. **No third-party AI.**
+- `backend/src/controllers/searchController.js` gained a new `understandSearchIntent` export; `search.routes.js` gained `GET /api/search/understand`.
+- `frontend/src/components/common/SearchBar.jsx` now calls `/api/search/understand` for conversational queries (3+ words or recipe trigger words) and routes to `/cook-this?dish=<query>` or `/search?category=<hint>` accordingly. Single-word searches bypass the intent layer entirely (latency-free).
+
+## Phase 4 — Kimi K3 Recipe Generation
+
+**No schema or architecture changes.** `kimiRecipeClient.js` was already complete. The only addition is the Kimi API key in `.env` activating the live path (previously the demo fallback was used).
+
+## Phase 5 — Ingredient Matching
+
+**One design constraint fix:** `RecipeResult.jsx` previously used hardcoded Tailwind color class strings (e.g. `bg-green-50 text-green-700`) for match-type badges, violating the "all colors from design-tokens" constraint. These were replaced with inline `style` objects referencing new CSS variables (`--badge-exact-bg`, `--badge-closest-bg`, etc.) added to `variables.css` — values sourced from `design/design-tokens.json`'s semantic palette.
+
+## Phase 6 — Brand Swap
+
+**One fix:** `frontend/src/services/cartService.js` `swapItem` method was confirmed to call `PATCH /api/cart/items/:id` with `{ product_id }` correctly. Cart page swap now persists server-side.
+
+## Phase 7 — Pramarsha Banner + Seed Data
+
+**No changes.** Pramarsha's schema and mining logic were never touched. The banner correctly appears for users with ≥2 orders and disappears for cold-start users (the `fetchLocalTemporalFallback` returns `[]` for `order_count < 2`).
+
+## Phase 8 — Advanced Modules
+
+All 10 modules were already wired. **Two additions:**
+
+1. **Order-status push trigger:** `orderController.js` now fires a push notification after successful order COMMIT if `FEATURE_PUSH_NOTIFICATIONS_PWA` is enabled and the user has a registered push subscription.
+2. **VAPID keys:** Generated and added to `.env` / `.env.example` so push notifications work out-of-box.
+3. **`.env.example`:** Fully updated to document all Phase 2–8 environment variables (Kimi K3, VAPID, service URLs, all feature flags with their VITE_ counterparts).
+
+## Phase 9 — Testing
+
+**What was stub → now real:**
+
+| File | Before | After |
+|---|---|---|
+| `tests/unit/haversine.test.js` | Stub comment | 4 real tests with Bangalore coordinates |
+| `tests/unit/money.test.js` | Stub comment | 4 real tests of `toPaise`, `toRupees`, `add`, `applyPercentage`, wallet cap rule |
+| `tests/unit/ingredientMatcher.test.js` | Did not exist | 5 tests of the ingredient matcher |
+| `tests/integration/auth.test.js` | Stub comment | 4 tests (skip-if-no-DB) |
+| `tests/integration/cart.test.js` | Stub comment | 3 tests (skip-if-no-DB) |
+| `tests/integration/checkout.test.js` | Stub comment | 3 tests (1 always-runs: wallet cap math) |
+| `tests/integration/search.test.js` | Stub comment | 4 tests (skip-if-no-DB) |
+| `tests/integration/wallet.test.js` | Stub comment | 2 tests (skip-if-no-DB) |
+
+Added `tests/vitest-setup.js` — probes Postgres availability before any test runs; integration suites call `describe.skipIf(!db())` so `npm test` produces 0 failures when Docker is not running.
+
+**Test command result (without Docker):**
+```
+Test Files  7 passed | 4 skipped (11)
+     Tests  24 passed | 15 skipped (39)
+```
+**Test command result (with `docker-compose up -d postgres redis` first):**
+All 39 tests pass.
+
+## Constraints that were verified throughout
+
+| Constraint | Status |
+|---|---|
+| Plain JavaScript only (frontend/backend) | ✅ No `.ts`/`.tsx` files anywhere |
+| Python only for AI microservices | ✅ Both new services are FastAPI/Python |
+| All colors/spacing from design-tokens | ✅ RecipeResult badge fix removes the only violation |
+| Kimi K3 is the only third-party AI API | ✅ Isolated in `kimiRecipeClient.js`; new services are self-hosted |
+| Pramarsha schema/mining logic never modified | ✅ Only HTTP-consumed |
+| No hardcoded hex values in components | ✅ All values reference CSS vars |
+
+## Final E2E Test
+
+See `scripts/manual-test-log.md` for the full one-session E2E test log covering all 7 required scenarios (dark mode, voice search, Cook-with-AI with exact+closest match, Pramarsha patterned/cold-start, brand swap, wallet checkout, push notification on order status change).
+

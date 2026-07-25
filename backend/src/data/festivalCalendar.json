@@ -1,0 +1,180 @@
+[
+  {
+    "name": "Makar Sankranti",
+    "date": "01-14",
+    "region": "national",
+    "lead_days": 3,
+    "type": "fixed"
+  },
+  {
+    "name": "Republic Day",
+    "date": "01-26",
+    "region": "national",
+    "lead_days": 2,
+    "type": "fixed"
+  },
+  {
+    "name": "Holi",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 5,
+    "year_dates": {
+      "2026": "03-10",
+      "2027": "02-28",
+      "2028": "03-17"
+    }
+  },
+  {
+    "name": "Ugadi / Gudi Padwa",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "03-29",
+      "2027": "03-18",
+      "2028": "04-06"
+    }
+  },
+  {
+    "name": "Ram Navami",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "04-06",
+      "2027": "03-27",
+      "2028": "04-14"
+    }
+  },
+  {
+    "name": "Independence Day",
+    "date": "08-15",
+    "region": "national",
+    "lead_days": 2,
+    "type": "fixed"
+  },
+  {
+    "name": "Janmashtami",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "08-25",
+      "2027": "08-15",
+      "2028": "09-02"
+    }
+  },
+  {
+    "name": "Ganesh Chaturthi",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 5,
+    "year_dates": {
+      "2026": "09-05",
+      "2027": "08-26",
+      "2028": "09-13"
+    }
+  },
+  {
+    "name": "Navratri",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 5,
+    "year_dates": {
+      "2026": "10-11",
+      "2027": "10-01",
+      "2028": "10-19"
+    }
+  },
+  {
+    "name": "Dussehra",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "10-20",
+      "2027": "10-10",
+      "2028": "10-28"
+    }
+  },
+  {
+    "name": "Diwali",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 7,
+    "year_dates": {
+      "2026": "11-08",
+      "2027": "10-29",
+      "2028": "11-15"
+    }
+  },
+  {
+    "name": "Bhai Dooj",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 2,
+    "year_dates": {
+      "2026": "11-10",
+      "2027": "10-31",
+      "2028": "11-17"
+    }
+  },
+  {
+    "name": "Eid ul-Fitr",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 5,
+    "year_dates": {
+      "2026": "03-21",
+      "2027": "03-10",
+      "2028": "02-28"
+    }
+  },
+  {
+    "name": "Eid ul-Adha",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "05-28",
+      "2027": "05-17",
+      "2028": "05-06"
+    }
+  },
+  {
+    "name": "Christmas",
+    "date": "12-25",
+    "region": "national",
+    "lead_days": 5,
+    "type": "fixed"
+  },
+  {
+    "name": "Pongal / Lohri",
+    "date": "01-13",
+    "region": "national",
+    "lead_days": 3,
+    "type": "fixed"
+  },
+  {
+    "name": "Onam",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 5,
+    "year_dates": {
+      "2026": "09-06",
+      "2027": "08-26",
+      "2028": "09-14"
+    }
+  },
+  {
+    "name": "Raksha Bandhan",
+    "type": "lunar",
+    "region": "national",
+    "lead_days": 3,
+    "year_dates": {
+      "2026": "08-12",
+      "2027": "08-01",
+      "2028": "08-19"
+    }
+  }
+]

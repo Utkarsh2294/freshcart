@@ -1,4 +1,5 @@
 import { pool } from '../config/database.js';
+import { featureFlags } from '../config/featureFlags.js';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -152,10 +153,41 @@ export const createOrder = async (req, res) => {
         VALUES ($1, $2, $3, 'ordered')
       `, [userId, item.product_id, address?.city || 'demo']);
     }
-
     await client.query("UPDATE carts SET status = 'checked_out' WHERE id = $1", [cartId]);
 
     await client.query('COMMIT');
+
+    // Phase 8: fire push notification on order placement if feature is enabled
+    if (featureFlags.pushNotificationsPwa) {
+      try {
+        const subs = await pool.query(
+          'SELECT endpoint, keys FROM push_subscriptions WHERE user_id = $1',
+          [userId]
+        );
+        if (subs.rows.length > 0) {
+          const webpush = await import('web-push');
+          const { config } = await import('../config/index.js');
+          if (config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY) {
+            webpush.default.setVapidDetails(
+              'mailto:support@freshcart.local',
+              config.VAPID_PUBLIC_KEY,
+              config.VAPID_PRIVATE_KEY
+            );
+            const payload = JSON.stringify({
+              title: 'Order placed! 🛒',
+              body: `Your order #${order.id} is confirmed and being prepared.`,
+              trigger_type: 'order_status',
+            });
+            for (const sub of subs.rows) {
+              await webpush.default.sendNotification(sub, payload).catch(() => {});
+            }
+          }
+        }
+      } catch {
+        // push failure must never break checkout
+      }
+    }
+
     res.status(201).json(order);
   } catch (error) {
     await client.query('ROLLBACK');
