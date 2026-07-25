@@ -56,10 +56,10 @@ jobs:
 
       - name: Verify no TypeScript files
         run: |
-          count=$(find . -path ./node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print | wc -l)
+          count=$(find . -name node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print | wc -l)
           if [ "$count" -gt 0 ]; then
             echo "ERROR: Found .ts/.tsx files!"
-            find . -path ./node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print
+            find . -name node_modules -prune -o \( -name '*.ts' -o -name '*.tsx' \) -print
             exit 1
           fi
 
