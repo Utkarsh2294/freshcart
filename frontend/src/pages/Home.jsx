@@ -68,6 +68,15 @@ export default function Home() {
     }
   };
 
+  const handleAddPramarshaProduct = async (product) => {
+    try {
+      await addItem(product.id, 1, 'suggestion');
+      addToast({ type: 'success', message: `${product.name} added to cart.` });
+    } catch {
+      addToast({ type: 'error', message: 'Could not add this recommendation.' });
+    }
+  };
+
   const handleAddReorder = async () => {
     try {
       for (const product of reorderRail) {
@@ -107,6 +116,7 @@ export default function Home() {
         recommendation={pramarsha}
         isAdding={isAddingPramarsha}
         onAddAll={handleAddPramarsha}
+        onAddProduct={handleAddPramarshaProduct}
       />
 
       {featureFlags.predictiveReorderFeed && reorderRail.length > 0 && (

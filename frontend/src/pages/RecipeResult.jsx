@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCartStore } from '../store/cartStore';
 import SwapSheet from '../components/common/SwapSheet';
 import { featureFlags } from '../utils/featureFlags';
+import { renderRecipeStep } from 'freshcart-shared/i18n/renderRecipeStep';
 
 const badgeStyles = {
   exact: 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300',
@@ -31,6 +32,7 @@ export default function RecipeResult() {
   const [message, setMessage] = useState('');
   const [cookingMode, setCookingMode] = useState(false);
   const [cookingStep, setCookingStep] = useState(0);
+  const [language, setLanguage] = useState(() => localStorage.getItem('freshcart_recipe_language') || 'en');
 
   const selectedMatches = useMemo(() => {
     return localMatches.filter(match => match.product && selected.has(match.product.id));
@@ -114,11 +116,20 @@ export default function RecipeResult() {
   };
 
   const readStep = () => {
-    const text = recipe.steps?.[cookingStep];
+    const text = displayStep(recipe.steps?.[cookingStep]);
     if (!text || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
   };
+
+  const changeLanguage = (nextLanguage) => {
+    setLanguage(nextLanguage);
+    localStorage.setItem('freshcart_recipe_language', nextLanguage);
+  };
+
+  const displayStep = (step) => renderRecipeStep(step, language, {
+    onUnmatchedTerm: (info) => console.info('[recipe-i18n:fallback]', info),
+  });
 
   const openCookingMode = async () => {
     setCookingMode(true);
@@ -180,10 +191,28 @@ export default function RecipeResult() {
           )}
 
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold tracking-normal text-[var(--text-primary)]">Instructions</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl font-bold tracking-normal text-[var(--text-primary)]">Instructions</h2>
+              <div className="flex rounded-xl bg-[var(--bg-surface)] p-1 text-sm font-bold">
+                {[
+                  ['en', 'English'],
+                  ['hi', 'हिन्दी'],
+                  ['hinglish', 'Hinglish'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => changeLanguage(value)}
+                    className={`rounded-lg px-3 py-2 ${language === value ? 'bg-[var(--bg-card)] text-[#8B5CF6] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {(recipe.steps || []).map((step, index) => (
               <div
-                key={`${step}-${index}`}
+                key={`${typeof step === 'string' ? step : step.id}-${index}`}
                 className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] transition-all ${
                   expandedStep === index ? 'border-[#8B5CF6] shadow-md dark:shadow-none' : 'border-[var(--border-default)]'
                 }`}
@@ -203,7 +232,7 @@ export default function RecipeResult() {
                   <ChevronDown className={`h-5 w-5 text-[var(--text-secondary)] transition-transform ${expandedStep === index ? 'rotate-180' : ''}`} />
                 </button>
                 {expandedStep === index && (
-                  <div className="px-4 pb-4 pl-16 text-[var(--text-secondary)]">{step}</div>
+                  <div className="px-4 pb-4 pl-16 text-[var(--text-secondary)]">{displayStep(step)}</div>
                 )}
               </div>
             ))}
@@ -320,7 +349,7 @@ export default function RecipeResult() {
           </div>
           <div className="flex flex-1 items-center justify-center text-center">
             <p className="max-w-4xl text-4xl font-black leading-tight tracking-normal md:text-6xl">
-              {recipe.steps?.[cookingStep]}
+              {displayStep(recipe.steps?.[cookingStep])}
             </p>
           </div>
           <div className="flex items-center justify-between">

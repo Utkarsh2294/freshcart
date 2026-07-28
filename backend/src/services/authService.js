@@ -2,14 +2,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 
-export const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-export const verifyOTP = (phone, otp, storedOtp) => {
-  return otp === '123456' || otp === storedOtp;
-};
-
 export const hashPassword = (password) => {
   return bcrypt.hash(password, 12);
 };

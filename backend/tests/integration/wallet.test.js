@@ -8,15 +8,14 @@ let token;
 
 beforeAll(async () => {
   if (!db()) return;
-  await request(app).post('/api/auth/otp/request').send({ phone: '9876543210' });
   const res = await request(app)
-    .post('/api/auth/otp/verify')
-    .send({ phone: '9876543210', otp: '123456' });
+    .post('/api/auth/login')
+    .send({ email: 'customer@freshcart.local', password: 'password123' });
   token = res.body?.accessToken;
 });
 
 describe.skipIf(!db())('Wallet API', () => {
-  it('GET /api/wallet — returns balance when authenticated', async () => {
+  it('GET /api/wallet returns balance when authenticated', async () => {
     if (!token) return;
     const res = await request(app)
       .get('/api/wallet')
@@ -26,7 +25,7 @@ describe.skipIf(!db())('Wallet API', () => {
     expect(typeof Number(res.body.balance)).toBe('number');
   });
 
-  it('GET /api/wallet — 401 without token', async () => {
+  it('GET /api/wallet returns 401 without token', async () => {
     const res = await request(app).get('/api/wallet');
     expect(res.status).toBe(401);
   });

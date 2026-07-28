@@ -296,7 +296,7 @@ export const swapItem = async (req, res, next) => {
       return res.status(404).json({ error: 'Cart item not found' });
     }
 
-    const { new_product_id } = req.body;
+    const new_product_id = req.body.new_product_id || req.body.product_id;
     if (String(new_product_id) === String(item.product_id)) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Choose a different product to swap' });

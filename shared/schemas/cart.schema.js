@@ -11,5 +11,6 @@ export const cartItemUpdateSchema = Joi.object({
 });
 
 export const cartItemSwapSchema = Joi.object({
-  new_product_id: Joi.number().integer().positive().required(),
-});
+  new_product_id: Joi.number().integer().positive(),
+  product_id: Joi.number().integer().positive(),
+}).or('new_product_id', 'product_id');

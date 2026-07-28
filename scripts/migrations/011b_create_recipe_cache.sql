@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS recipe_cache (
     title       VARCHAR(255)  NOT NULL,
     steps       JSONB         NOT NULL,
     ingredients JSONB         NOT NULL,
-    source      VARCHAR(20)   NOT NULL DEFAULT 'kimi_api',
+    source      VARCHAR(20)   NOT NULL DEFAULT 'gemini_api',
     created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
     CONSTRAINT recipe_cache_dish_servings_unique UNIQUE (dish_name, servings)

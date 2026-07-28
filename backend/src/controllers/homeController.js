@@ -90,7 +90,7 @@ function getTemporalReasonTag(now) {
   const timeInMinutes = hour * 60 + minutes;
 
   // 22:30–02:00 → late_night_munchies (wraps past midnight)
-  if (timeInMinutes >= 1350 || timeInMinutes < 120) return 'late_night_munchies';
+  if (timeInMinutes >= 1350 || timeInMinutes < 240) return 'late_night_munchies';
   // 02:00–09:00 → early_morning_essentials (pre-dawn + morning)
   if (timeInMinutes < 540) return 'early_morning_essentials';
   // 09:00–12:00 → weekday_breakfast / weekend_brunch
@@ -119,7 +119,7 @@ function normalizeRecommendation(result) {
     reason_tag: reasonTag,
     headline: first.headline || headlineForReason(reasonTag),
     confidence,
-    products: products.slice(0, 3).map(product => ({
+    products: products.slice(0, 8).map(product => ({
       id: product.id || product.product_id,
       product_id: product.product_id || product.id,
       name: product.name,
@@ -169,7 +169,39 @@ async function fetchLocalTemporalFallback(userId) {
     return [];
   }
 
-  const categoryResult = await pool.query(`
+  const temporalTag = getTemporalReasonTag(new Date());
+  const isLateNight = temporalTag === 'late_night_munchies';
+
+  const lateNightUserCategory = isLateNight ? await pool.query(`
+    SELECT p.category_id, c.name AS category_name, COUNT(*)::int AS purchase_count
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    JOIN products p ON p.id = oi.product_id
+    JOIN categories c ON c.id = p.category_id
+    WHERE o.user_id = $1
+      AND (EXTRACT(HOUR FROM o.created_at) * 60 + EXTRACT(MINUTE FROM o.created_at) >= 1350
+        OR EXTRACT(HOUR FROM o.created_at) * 60 + EXTRACT(MINUTE FROM o.created_at) < 240)
+    GROUP BY p.category_id, c.name
+    ORDER BY purchase_count DESC, c.name ASC
+    LIMIT 1
+  `, [userId]) : { rows: [] };
+
+  const lateNightCohortCategory = isLateNight && !lateNightUserCategory.rows.length ? await pool.query(`
+    SELECT p.category_id, c.name AS category_name, COUNT(*)::int AS purchase_count
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    JOIN products p ON p.id = oi.product_id
+    JOIN categories c ON c.id = p.category_id
+    WHERE EXTRACT(HOUR FROM o.created_at) * 60 + EXTRACT(MINUTE FROM o.created_at) >= 1350
+       OR EXTRACT(HOUR FROM o.created_at) * 60 + EXTRACT(MINUTE FROM o.created_at) < 240
+    GROUP BY p.category_id, c.name
+    ORDER BY purchase_count DESC, c.name ASC
+    LIMIT 1
+  `) : { rows: [] };
+
+  const categoryResult = (lateNightUserCategory.rows.length || lateNightCohortCategory.rows.length)
+    ? { rows: lateNightUserCategory.rows.length ? lateNightUserCategory.rows : lateNightCohortCategory.rows }
+    : await pool.query(`
     SELECT p.category_id, c.name AS category_name, COUNT(*)::int AS purchase_count
     FROM orders o
     JOIN order_items oi ON oi.order_id = o.id
@@ -203,13 +235,10 @@ async function fetchLocalTemporalFallback(userId) {
     WHERE p.category_id = $1
       AND p.stock_qty > 0
     ORDER BY COALESCE(ps.final_score, 0.55) DESC, p.stock_qty DESC, p.name ASC
-    LIMIT 3
+    LIMIT 8
   `, [category.category_id]);
 
   if (!productResult.rows.length) return [];
-
-  const now = new Date();
-  const temporalTag = getTemporalReasonTag(now);
 
   return [{
     signal_type: 'temporal',

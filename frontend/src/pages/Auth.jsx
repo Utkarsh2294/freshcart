@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { Lock, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import * as authService from '../services/authService';
+import { mergeGuestCart } from '../services/cartService';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import { useUiStore } from '../store/uiStore';
@@ -44,6 +45,7 @@ export default function Auth() {
         : await authService.loginWithEmail(email, password);
 
       login(data.user, data.accessToken || data.token);
+      await mergeGuestCart();
       navigate(from, { replace: true });
       addToast({ type: 'success', message: isSignup ? 'Account created successfully' : 'Logged in successfully' });
     } catch (err) {

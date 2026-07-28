@@ -1,5 +1,7 @@
-import { ArrowRight, CloudRain, Loader2, Plus, RefreshCw, Sparkles, Sun } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, CloudRain, Loader2, Plus, RefreshCw, Sparkles, Sun, X } from 'lucide-react';
 import { getProductImage } from '../../utils/productImages';
+import { formatPrice } from '../../utils/formatters';
 
 /**
  * Eyebrow suffix and accent icon per signal_type (§5).
@@ -53,7 +55,9 @@ export default function PramarshaBanner({
   recommendation,
   isAdding = false,
   onAddAll,
+  onAddProduct,
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   if (!recommendation) return null;
 
   const products = recommendation.products || [];
@@ -66,7 +70,19 @@ export default function PramarshaBanner({
   const AccentIcon = getAccentIcon(signalType, reasonTag);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E] via-[#14B8A6] to-[#22C55E] p-5 text-white shadow-sm">
+    <>
+    <section
+      role="button"
+      tabIndex={0}
+      onClick={() => setIsExpanded(true)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setIsExpanded(true);
+        }
+      }}
+      className="cursor-pointer overflow-hidden rounded-2xl border border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E] via-[#14B8A6] to-[#22C55E] p-5 text-white shadow-sm"
+    >
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-white/80">
@@ -81,6 +97,9 @@ export default function PramarshaBanner({
           </div>
           <p className="mt-2 max-w-xl text-sm text-white/80">
             Based on your recent Freshcart timing and repeat-order pattern.
+          </p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-normal text-white/70">
+            Tap to view all {products.length} suggested items
           </p>
         </div>
 
@@ -108,5 +127,48 @@ export default function PramarshaBanner({
         </div>
       </div>
     </section>
+    {isExpanded && (
+      <div className="fixed inset-0 z-[70] bg-black/60 p-4 backdrop-blur-sm" onClick={() => setIsExpanded(false)}>
+        <div className="mx-auto mt-8 max-h-[86vh] max-w-5xl overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-normal text-[#14B8A6]">Pramarsha</p>
+              <h3 className="text-xl font-black text-[var(--text-primary)]">{recommendation.headline}</h3>
+            </div>
+            <button type="button" onClick={() => setIsExpanded(false)} className="rounded-full bg-[var(--bg-surface)] p-2 text-[var(--text-secondary)]">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {products.map(product => (
+              <div key={product.id} className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3">
+                <img src={getProductImage(product)} alt={product.name} className="mb-3 h-24 w-full rounded-lg bg-white object-contain" />
+                <p className="line-clamp-2 min-h-10 text-sm font-bold text-[var(--text-primary)]">{product.name}</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">{product.brand} · {product.unit}</p>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <span className="font-black text-[var(--text-primary)]">{formatPrice(product.price)}</span>
+                  <button type="button" onClick={() => onAddProduct?.(product)} className="rounded-lg bg-[#14B8A6] px-3 py-2 text-xs font-bold text-white">
+                    Add
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAddAll?.();
+            }}
+            disabled={isAdding}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 py-3 text-sm font-bold text-white disabled:opacity-70"
+          >
+            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Add all recommendations
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

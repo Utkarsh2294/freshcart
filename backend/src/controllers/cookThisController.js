@@ -2,7 +2,7 @@
  * controllers/cookThisController.js
  *
  * Handles POST /ai/cook-this/generate. Cache-first: checks recipe_cache
- * before ever calling kimiRecipeClient. Returns the same response shape
+ * before ever calling geminiRecipeClient. Returns the same response shape
  * regardless of cache hit or miss — the frontend never needs to know which
  * path it took.
  *
@@ -13,7 +13,7 @@
  */
 
 import Joi from 'joi';
-import { generateRecipe, RecipeGenerationError } from '../services/kimiRecipeClient.js';
+import { generateRecipe, RecipeGenerationError } from '../services/geminiRecipeClient.js';
 import { pool } from '../config/database.js';
 import { matchIngredientsToProducts } from '../services/ingredientMatcherService.js';
 import { featureFlags } from '../config/featureFlags.js';
@@ -34,6 +34,7 @@ const matchRequestSchema = Joi.object({
     name: Joi.string().trim().min(1).required(),
     qty: Joi.number().positive().required(),
     unit: Joi.string().allow('', null).default(null),
+    notes: Joi.string().allow('', null).default(null),
   })).min(1).required(),
   servings: Joi.number().integer().min(1).max(50).optional(),
 }).required();
@@ -68,7 +69,7 @@ async function cacheRecipe(dishName, servings, recipe) {
   // to its own caller correctly (just not persisted twice).
   await pool.query(
     `INSERT INTO recipe_cache (dish_name, servings, title, steps, ingredients, source)
-     VALUES ($1, $2, $3, $4, $5, 'kimi_api')
+     VALUES ($1, $2, $3, $4, $5, 'gemini_api')
      ON CONFLICT (dish_name, servings) DO NOTHING`,
     [
       dishName,
@@ -108,7 +109,7 @@ async function generateRecipeHandler(req, res) {
       title: recipe.title,
       steps: recipe.steps,
       ingredients: recipe.ingredients,
-      source: 'kimi_api',
+      source: 'gemini_api',
     });
   } catch (err) {
     if (err instanceof RecipeGenerationError) {

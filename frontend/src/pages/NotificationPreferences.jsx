@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, ShoppingBag, Tag, Smartphone, Mail, AlertCircle, Send } from 'lucide-react';
+import { Bell, ShoppingBag, Tag, Mail, AlertCircle, Send } from 'lucide-react';
 import * as notificationService from '../services/notificationService';
 import { useUiStore } from '../store/uiStore';
 
@@ -9,7 +9,6 @@ export default function NotificationPreferences() {
     back_in_stock: true,
     price_drop: true,
     emailOffers: true,
-    smsAlerts: false
   });
   const { addToast } = useUiStore();
 
@@ -144,24 +143,6 @@ export default function NotificationPreferences() {
               className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.emailOffers ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
             >
               <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.emailOffers ? 'translate-x-6' : 'translate-x-0'}`} />
-            </button>
-          </div>
-
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-gray-50 dark:bg-[#0F111A] rounded-2xl">
-                <Smartphone className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">SMS Alerts</h3>
-                <p className="text-sm text-gray-500">Critical account updates only</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => toggle('smsAlerts')}
-              className={`w-14 h-8 rounded-full p-1 transition-colors ${prefs.smsAlerts ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${prefs.smsAlerts ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>

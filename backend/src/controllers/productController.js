@@ -33,12 +33,12 @@ export const list = async (req, res, next) => {
       min_price,
       max_price,
       page = 1,
-      limit = 20,
+      limit,
     } = req.query;
 
     const currentPage = Number(page);
-    const pageSize = Number(limit);
-    const offset = (currentPage - 1) * pageSize;
+    const pageSize = limit ? Number(limit) : null;
+    const offset = pageSize ? (currentPage - 1) * pageSize : 0;
     const values = [];
     const whereClauses = [];
     let valIndex = 1;
@@ -115,8 +115,9 @@ export const list = async (req, res, next) => {
       orderSql = ' ORDER BY p.stock_qty DESC, p.name ASC';
     }
 
-    const itemsSql = `${selectSql}${fromSql}${whereSql}${orderSql} LIMIT $${valIndex} OFFSET $${valIndex + 1}`;
-    const result = await pool.query(itemsSql, [...values, pageSize, offset]);
+    const paginationSql = pageSize ? ` LIMIT $${valIndex} OFFSET $${valIndex + 1}` : '';
+    const itemsSql = `${selectSql}${fromSql}${whereSql}${orderSql}${paginationSql}`;
+    const result = await pool.query(itemsSql, pageSize ? [...values, pageSize, offset] : values);
     const countResult = await pool.query(`SELECT COUNT(p.id) AS total ${fromSql}${whereSql}`, values);
     const total = Number(countResult.rows[0]?.total || 0);
 
@@ -125,8 +126,8 @@ export const list = async (req, res, next) => {
       meta: {
         total,
         page: currentPage,
-        limit: pageSize,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        limit: pageSize || total,
+        totalPages: pageSize ? Math.max(1, Math.ceil(total / pageSize)) : 1,
       },
     });
   } catch (error) {

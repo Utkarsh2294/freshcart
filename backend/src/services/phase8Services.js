@@ -1,6 +1,6 @@
 import { pool } from '../config/database.js';
 import { matchIngredientsToProducts } from './ingredientMatcherService.js';
-import { generateRecipe } from './kimiRecipeClient.js';
+import { generateRecipe } from './geminiRecipeClient.js';
 
 const DAY_SEEDS = [
   ['poha', 'idli', 'masala omelette'],

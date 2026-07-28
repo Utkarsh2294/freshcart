@@ -8,20 +8,19 @@ let token;
 
 beforeAll(async () => {
   if (!db()) return;
-  await request(app).post('/api/auth/otp/request').send({ phone: '9876543210' });
   const res = await request(app)
-    .post('/api/auth/otp/verify')
-    .send({ phone: '9876543210', otp: '123456' });
+    .post('/api/auth/login')
+    .send({ email: 'customer@freshcart.local', password: 'password123' });
   token = res.body?.accessToken;
 });
 
 describe.skipIf(!db())('Cart API', () => {
-  it('GET /api/cart — 401 without token', async () => {
+  it('GET /api/cart returns 401 without token', async () => {
     const res = await request(app).get('/api/cart');
     expect(res.status).toBe(401);
   });
 
-  it('GET /api/cart — returns cart when authenticated', async () => {
+  it('GET /api/cart returns cart when authenticated', async () => {
     if (!token) return;
     const res = await request(app)
       .get('/api/cart')
@@ -32,7 +31,7 @@ describe.skipIf(!db())('Cart API', () => {
     expect(Array.isArray(res.body.cart.items)).toBe(true);
   });
 
-  it('POST /api/cart/items — rejects missing product_id', async () => {
+  it('POST /api/cart/items rejects missing product_id', async () => {
     if (!token) return;
     const res = await request(app)
       .post('/api/cart/items')

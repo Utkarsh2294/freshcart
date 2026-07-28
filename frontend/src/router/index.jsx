@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
       { path: 'product/:id', element: <ProductDetail /> },
       { path: 'cook-this', element: <CookThis /> },
       { path: 'recipe-result', element: <RecipeResult /> },
-      { path: 'cart', element: <ProtectedRoute><Cart /></ProtectedRoute> },
+      { path: 'cart', element: <Cart /> },
       { path: 'checkout', element: <ProtectedRoute><Checkout /></ProtectedRoute> },
       { path: 'orders', element: <ProtectedRoute><OrderHistory /></ProtectedRoute> },
       { path: 'orders/:id', element: <ProtectedRoute><OrderTracking /></ProtectedRoute> },

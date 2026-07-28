@@ -1,10 +1,7 @@
 /** Application-wide constants */
 
 export const WALLET_CAP_PERCENT = 50; // Wallet may cover at most 50% of order value
-export const REFERRAL_BONUS_RUPEES = 50; // ₹50 for both referrer and new user
-export const OTP_EXPIRY_SECONDS = 300; // 5 minutes
-export const OTP_LENGTH = 6;
-export const MOCK_OTP = '123456'; // MVP mock OTP
+export const REFERRAL_BONUS_RUPEES = 50; // Rs 50 for both referrer and new user
 
 export const PAGINATION = {
   DEFAULT_PAGE: 1,

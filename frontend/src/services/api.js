@@ -22,7 +22,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('freshcart_token');
       localStorage.removeItem('freshcart_user');
-      window.location.href = '/auth';
     }
     return Promise.reject(error);
   }

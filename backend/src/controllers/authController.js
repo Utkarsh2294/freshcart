@@ -1,5 +1,4 @@
 import { pool } from '../config/database.js';
-import { redisClient } from '../config/redis.js';
 import * as authService from '../services/authService.js';
 
 const publicUser = (user) => ({
@@ -22,7 +21,7 @@ const sendAuthResponse = (res, user) => {
   });
 };
 
-export const signupWithEmail = async (req, res, next) => {
+export const registerWithEmail = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
     const normalizedEmail = email.trim().toLowerCase();
@@ -55,49 +54,6 @@ export const loginWithEmail = async (req, res, next) => {
 
     if (!user || !(await authService.verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    sendAuthResponse(res, user);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const requestOtp = async (req, res, next) => {
-  try {
-    const { phone } = req.body;
-    const otp = authService.generateOTP();
-
-    await redisClient.setex(`otp:${phone}`, 300, otp);
-
-    console.log(`[MOCK SMS] OTP for ${phone} is ${otp}`);
-
-    res.json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const verifyOtp = async (req, res, next) => {
-  try {
-    const { phone, otp, name } = req.body;
-
-    const storedOtp = await redisClient.get(`otp:${phone}`);
-    if (!storedOtp || !authService.verifyOTP(phone, otp, storedOtp)) {
-      return res.status(401).json({ error: 'Invalid or expired OTP' });
-    }
-
-    await redisClient.del(`otp:${phone}`);
-
-    let result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
-    let user = result.rows[0];
-
-    if (!user) {
-      result = await pool.query(
-        'INSERT INTO users (phone, name, role) VALUES ($1, $2, $3) RETURNING *',
-        [phone, name || null, 'customer']
-      );
-      user = result.rows[0];
     }
 
     sendAuthResponse(res, user);

@@ -1,6 +1,24 @@
 import { create } from 'zustand';
 import * as orderService from '../services/orderService';
 
+const normalizeOrder = (order = {}) => ({
+  ...order,
+  id: order.id,
+  _id: String(order._id || order.id || ''),
+  createdAt: order.createdAt || order.created_at,
+  walletAmountApplied: Number(order.walletAmountApplied || order.wallet_amount_applied || 0),
+  items: Array.isArray(order.items)
+    ? order.items.map(item => ({
+      ...item,
+      product: item.product || {
+        id: item.product_id,
+        name: item.name || 'Product',
+        image_url: item.image_url,
+      },
+    }))
+    : [],
+});
+
 export const useOrderStore = create((set) => ({
   orders: [],
   currentOrder: null,
@@ -11,7 +29,8 @@ export const useOrderStore = create((set) => ({
     set({ isLoading: true });
     try {
       const data = await orderService.getOrders(page);
-      set({ orders: Array.isArray(data) ? data : data.orders || [] });
+      const orders = Array.isArray(data) ? data : data.orders || [];
+      set({ orders: orders.map(normalizeOrder) });
     } catch (err) {
       console.error(err);
     } finally {
@@ -23,8 +42,9 @@ export const useOrderStore = create((set) => ({
     set({ isLoading: true });
     try {
       const data = await orderService.createOrder(orderData);
-      set({ currentOrder: data });
-      return data;
+      const order = normalizeOrder(data);
+      set({ currentOrder: order });
+      return order;
     } catch (err) {
       console.error(err);
       throw err;

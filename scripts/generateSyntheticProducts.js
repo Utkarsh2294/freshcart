@@ -150,7 +150,7 @@ const VARIANTS = {
 
   // ── 14. Feminine Hygiene ───────────────────────────────────────────────────
   'Sanitary Pads': [
-    { names: ['Whisper Ultra Nights', 'Stayfree Advanced Ultra Thin', 'Sofy Extra Large Wings', 'Carefree Sportz Liners', 'Nua Ultra Thin Pads'], brand: 'Whisper', units: ['6 pcs', '15 pcs', '30 pcs'] },
+    { names: ['Nua Ultra Nights', 'Stayfree Advanced Ultra Thin', 'Sofy Extra Large Wings', 'Carefree Sportz Liners', 'Nua Ultra Thin Pads'], brand: 'Nua', units: ['6 pcs', '15 pcs', '30 pcs'] },
   ],
 
   // ── 15. Baby Care ──────────────────────────────────────────────────────────

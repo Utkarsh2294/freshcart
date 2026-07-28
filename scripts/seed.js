@@ -193,7 +193,7 @@ const BRANDS = [
   'Head & Shoulders', 'Clinic Plus', 'Sunsilk', 'Pantene', 'TRESemmé',
   'Himalaya', 'Garnier', "Pond's", 'Clean & Clear', 'Vaseline',
   // Feminine Hygiene
-  'Whisper', 'Stayfree', 'Sofy', 'Nua', 'Carefree',
+  'Stayfree', 'Sofy', 'Nua', 'Carefree',
   // Baby Care
   'Pampers', 'Huggies', 'MamyPoko', 'Sirona', 'Supples',
   'Cerelac', 'Lactogen', 'Similac', 'NAN',
@@ -466,7 +466,7 @@ const REAL_PRODUCTS = [
   { name: 'Himalaya Protective Sunscreen Lotion SPF 15', category: 'Skin Care', brand: 'Himalaya', price: 120, mrp: 145, unit: '100 ml', dietary_tags: [] },
 
   // ── 14. Feminine Hygiene ───────────────────────────────────────────────────
-  { name: 'Whisper Ultra Clean Sanitary Pads', category: 'Sanitary Pads', brand: 'Whisper', price: 120, mrp: 138, unit: '15 pcs', dietary_tags: [] },
+  { name: 'Nua Ultra Clean Sanitary Pads', category: 'Sanitary Pads', brand: 'Nua', price: 120, mrp: 138, unit: '15 pcs', dietary_tags: [] },
   { name: 'Stayfree Secure Cottony Soft Pads', category: 'Sanitary Pads', brand: 'Stayfree', price: 110, mrp: 128, unit: '15 pcs', dietary_tags: [] },
   { name: 'Sofy Antibacterial Ultra Thin Pads', category: 'Sanitary Pads', brand: 'Sofy', price: 115, mrp: 132, unit: '15 pcs', dietary_tags: [] },
   { name: 'Nua Biodegradable Sanitary Pads', category: 'Sanitary Pads', brand: 'Nua', price: 149, mrp: 170, unit: '15 pcs', dietary_tags: [] },
@@ -671,10 +671,16 @@ async function seed() {
     const syntheticUserCount = await seedSyntheticUsers(client, demoPasswordHash);
     console.log(`   OK ${syntheticUserCount} synthetic users with repeat-order history\n`);
 
+    console.log('Seeding Pramarsha demo personas...');
+    await seedPramarshaDemoUsers(client, demoPasswordHash);
+    console.log('   OK Pramarsha demo personas\n');
+
     // ── Refresh Product Scores ────────────────
     console.log('Refreshing product scores...');
     const scoreCount = await refreshProductScores(client);
     console.log(`   OK ${scoreCount} product scores\n`);
+    await ensureCatalogCompatibility(client);
+    await bustCatalogCache();
 
     const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM products');
     console.log(`\n🎉 Seed complete! Total products: ${count}`);
@@ -771,6 +777,168 @@ async function seedSyntheticUsers(client, passwordHash) {
   }
 
   return SYNTHETIC_USER_COUNT;
+}
+
+function pickProducts(products, words, limit = 4) {
+  const needles = words.map(word => word.toLowerCase());
+  return products
+    .filter(product => needles.some(word => product.name.toLowerCase().includes(word)))
+    .slice(0, limit);
+}
+
+function orderTimestamp(weeksAgo, dayOffset, hour) {
+  const date = new Date();
+  date.setDate(date.getDate() - (weeksAgo * 7));
+  const currentDay = date.getDay();
+  date.setDate(date.getDate() - ((currentDay - dayOffset + 7) % 7));
+  date.setHours(hour, 15, 0, 0);
+  return date;
+}
+
+async function seedPramarshaOrder(client, userId, products, createdAt) {
+  if (!products.length) return;
+  const total = products.reduce((sum, product) => sum + Number(product.price), 0);
+  const { rows: [address] } = await client.query(
+    'SELECT id FROM addresses WHERE user_id = $1 AND is_default = true LIMIT 1',
+    [userId]
+  );
+  const { rows: [store] } = await client.query(
+    'SELECT id FROM dark_stores WHERE is_active = true ORDER BY id LIMIT 1'
+  );
+  const { rows: [order] } = await client.query(
+    `INSERT INTO orders (user_id, address_id, dark_store_id, status, total, payment_method, created_at)
+     VALUES ($1, $2, $3, 'delivered', $4, 'cod', $5)
+     RETURNING id`,
+    [userId, address.id, store.id, total.toFixed(2), createdAt]
+  );
+
+  for (const product of products) {
+    await client.query(
+      `INSERT INTO order_items (order_id, product_id, qty, price_at_purchase)
+       VALUES ($1, $2, 1, $3)`,
+      [order.id, product.id, product.price]
+    );
+  }
+}
+
+async function seedPramarshaDemoUsers(client, passwordHash) {
+  const { rows: products } = await client.query(`
+    SELECT id, name, price::float AS price
+    FROM products
+    WHERE stock_qty > 0
+    ORDER BY id
+  `);
+
+  const personas = [
+    {
+      name: 'Aditi Rao',
+      email: 'aditi.rao@freshcart.local',
+      phone: '8811100001',
+      words: ['Atta', 'Toor Dal', 'Toned Milk', 'Paneer'],
+      count: 10,
+      day: 0,
+      hour: 10,
+    },
+    {
+      name: 'Rohan Mehta',
+      email: 'rohan.mehta@freshcart.local',
+      phone: '8811100002',
+      words: ['Chips', 'Coca-Cola', 'Noodles', 'Namkeen'],
+      count: 8,
+      day: 3,
+      hour: 19,
+    },
+    {
+      name: 'Priya Nair',
+      email: 'priya.nair@freshcart.local',
+      phone: '8811100003',
+      words: ['Milk', 'Rice', 'Soap', 'Coffee', 'Juice', 'Tomato'],
+      count: 18,
+      day: 2,
+      hour: 23,
+    },
+    {
+      name: 'Kabir Sheikh',
+      email: 'kabir.sheikh@freshcart.local',
+      phone: '8811100004',
+      words: ['Milk', 'Bread'],
+      count: 1,
+      day: 5,
+      hour: 21,
+    },
+    {
+      name: 'Meera Iyer',
+      email: 'meera.iyer@freshcart.local',
+      phone: '8811100005',
+      words: ['Rice', 'Atta', 'Oil', 'Detergent'],
+      count: 6,
+      day: 6,
+      hour: 11,
+    },
+  ];
+
+  for (const persona of personas) {
+    const { rows: [user] } = await client.query(
+      `INSERT INTO users (phone, email, password_hash, name)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (phone) DO UPDATE
+       SET email = EXCLUDED.email,
+           password_hash = EXCLUDED.password_hash,
+           name = EXCLUDED.name
+       RETURNING id`,
+      [persona.phone, persona.email, passwordHash, persona.name]
+    );
+
+    await client.query(
+      `INSERT INTO addresses (user_id, label, lat, lng, full_address, is_default)
+       SELECT $1, 'Home', 12.9352, 77.6140, $2, true
+       WHERE NOT EXISTS (
+         SELECT 1 FROM addresses WHERE user_id = $1 AND label = 'Home'
+       )`,
+      [user.id, `${persona.name} Demo Address, Bangalore`]
+    );
+
+    const { rows: [{ order_count: orderCount }] } = await client.query(
+      'SELECT COUNT(*)::int AS order_count FROM orders WHERE user_id = $1',
+      [user.id]
+    );
+    if (orderCount > 0) continue;
+
+    const picks = pickProducts(products, persona.words, 4);
+    for (let i = 0; i < persona.count; i++) {
+      const rotated = picks.length
+        ? picks.slice(i % picks.length).concat(picks.slice(0, i % picks.length)).slice(0, Math.min(4, picks.length))
+        : products.slice(i, i + 3);
+      await seedPramarshaOrder(client, user.id, rotated, orderTimestamp(i, persona.day, persona.hour));
+    }
+  }
+}
+
+async function ensureCatalogCompatibility(client) {
+  await client.query(`
+    UPDATE products
+    SET pack_size_value = NULLIF(substring(unit FROM '([0-9]+(?:\\.[0-9]+)?)'), '')::numeric
+    WHERE pack_size_value IS NULL
+  `).catch(() => {});
+
+  await client.query(`
+    UPDATE products
+    SET search_vector = to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(unit, ''))
+    WHERE search_vector IS NULL
+  `).catch(() => {});
+}
+
+async function bustCatalogCache() {
+  if (!process.env.REDIS_URL) return;
+  try {
+    const Redis = (await import('ioredis')).default;
+    const redis = new Redis(process.env.REDIS_URL);
+    const keys = await redis.keys('catalog:*');
+    if (keys.length) await redis.del(keys);
+    await redis.quit();
+  } catch {
+    // Cache busting is best effort during seed.
+  }
 }
 
 async function refreshProductScores(client) {

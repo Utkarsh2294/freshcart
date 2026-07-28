@@ -208,7 +208,45 @@ export const listOrders = async (req, res, next) => {
       [userId, limit, offset]
     );
 
-    res.json(result.rows);
+    const orders = result.rows;
+    const orderIds = orders.map(order => order.id);
+    if (orderIds.length) {
+      const itemsResult = await pool.query(`
+        SELECT
+          oi.id,
+          oi.order_id,
+          oi.product_id,
+          oi.qty AS quantity,
+          oi.price_at_purchase::float AS price_at_purchase,
+          p.name,
+          p.image_url
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ANY($1::int[])
+        ORDER BY oi.id ASC
+      `, [orderIds]);
+      const itemsByOrder = new Map();
+      for (const item of itemsResult.rows) {
+        const current = itemsByOrder.get(item.order_id) || [];
+        current.push({
+          id: item.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_at_purchase: item.price_at_purchase,
+          product: {
+            id: item.product_id,
+            name: item.name,
+            image_url: item.image_url,
+          },
+        });
+        itemsByOrder.set(item.order_id, current);
+      }
+      orders.forEach(order => {
+        order.items = itemsByOrder.get(order.id) || [];
+      });
+    }
+
+    res.json(orders);
   } catch (error) {
     next(error);
   }

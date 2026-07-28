@@ -11,6 +11,7 @@
     ".": "./index.js",
     "./money": "./money.js",
     "./constants": "./constants.js",
+    "./i18n/*": "./i18n/*.js",
     "./schemas/*": "./schemas/*.js",
     "./enums/*": "./enums/*.js"
   },

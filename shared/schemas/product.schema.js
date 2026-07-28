@@ -6,7 +6,7 @@ export const productQuerySchema = Joi.object({
   search: Joi.string().max(200).optional(),
   sort: Joi.string().valid('price_asc', 'price_desc', 'newest', 'popular', 'relevance', 'deals').default('popular'),
   page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(100).default(20),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
   min_price: Joi.number().min(0).optional(),
   max_price: Joi.number().min(0).optional(),
 });
