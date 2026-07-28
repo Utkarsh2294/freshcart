@@ -33,13 +33,6 @@ A production-shaped grocery delivery platform with a locked, pixel-accurate desi
 12. [Screens & User Journeys](#screens--user-journeys)
 13. [Getting Started](#getting-started)
 14. [Project Structure](#project-structure)
-15. [Testing & Quality Gates](#testing--quality-gates)
-16. [Deployment & Observability](#deployment--observability)
-17. [Build Roadmap](#build-roadmap)
-18. [Seed Catalog](#seed-catalog)
-19. [Known Limitations & Honest Notes](#known-limitations--honest-notes)
-20. [Contributing](#contributing)
-21. [License](#license)
 
 ---
 
@@ -370,84 +363,9 @@ freshcart/
 └── docker-compose.yml
 ```
 
----
 
-## Testing & Quality Gates
-
-- **Unit tests** on all money math, the quantity resolution engine (all four branches, exhaustively), and every scoring calculation
-- **Integration tests** on every microservice boundary, including retry and caching behavior
-- **End-to-end tests** covering the full cook-with-AI → cart → checkout journey, wallet application, and swap flow
-- **Lint and format checks** are a hard, non-skippable gate in continuous integration — with no compiler in the stack, this is treated as load-bearing, not optional
-- **Load testing** across the core commerce path, the full cook-with-AI pipeline (staged, so the slowest step is always identifiable), and live tracking under concurrent load
 
 ---
 
-## Deployment & Observability
 
-- Containerized for both local development (Docker Compose) and production deployment
-- A resilience layer in front of every external dependency the recipe engine relies on — short timeouts, a single automatic retry, and a graceful fallback state, with call volume and cache hit rate tracked on a live dashboard so degradation is visible before it becomes a problem
-- Precached, versioned service worker builds with cache-busting on every deploy
-- Centralized metrics covering per-service latency, cache hit rates, and notification delivery health
 
----
-
-## Build Roadmap
-
-| Phase | Focus | Duration |
-|---|---|---|
-| 0 | Design system lock-in | 2 weeks |
-| 1 | Core commerce MVP | 5 weeks |
-| 2 | Reviews, ratings & recommendation engine | 2 weeks |
-| 3 | Voice search & intent understanding | 2 weeks |
-| 4 | Recipe generation pipeline | 2 weeks |
-| 5 | Ingredient grounding & quantity resolution | 3 weeks |
-| 6 | Brand swap | 2 weeks |
-| 7 | Pramarsha integration & catalog scale-up | 2 weeks |
-| 8 | Advanced feature layer (10 modules) | 5 weeks |
-| 9 | Testing, optimization & deployment | 3 weeks |
-
-**~24–26 weeks** solo/part-time end to end. A design-locked, demo-ready cook-to-cart experience with a real catalog is achievable in roughly **6–8 weeks** by prioritizing Phases 0, 1, and a scoped slice of Phases 3–5.
-
----
-
-## Seed Catalog
-
-The initial catalog is seeded from real-world reference SKUs spanning **Dairy, Vegetables, Fruits, Staples, Snacks, Beverages, and Personal Care**, then programmatically expanded into hundreds of realistic SKUs with deliberate pack-size variety across common staples (rice, atta, oil, dal, paneer) — specifically so the quantity resolution engine has genuine size diversity to demonstrate against.
-
-> Real brand names are used for demonstration purposes only and are not affiliated with this project. Product imagery should never be scraped from brand marketing material — use original or licensed assets only.
-
----
-
-## Known Limitations & Honest Notes
-
-- **Recipe generation is a real, external dependency** for the flagship feature — availability and response quality are bounded by the resilience layer described above, but not eliminated by it. This is a deliberate trade, made openly.
-- **Cold-start data** — ratings, reviews, and behavioral personalization all need real usage volume to be genuinely meaningful; the platform is seeded with realistic synthetic data for demonstration, and this is disclosed rather than hidden.
-- **Live rider tracking is simulated** via server-side position interpolation, not real fleet infrastructure — clearly documented as such rather than presented as production logistics.
-- **Photo-based dish input is not included in this build.** The cook-with-AI flow is text- and voice-first by design; a photo-input mode is a clean, independent addition for a future phase and does not require changes to the existing pipeline.
-- **Pramarsha's underlying logic is inherited, not built here.** This project integrates its output on the Home surface only and never modifies its internal data or mining logic.
-
----
-
-## Contributing
-
-Contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request, and make sure any change touching the commerce or intelligence layers includes corresponding tests — particularly anything touching money, cart state, or the quantity resolution engine.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes with clear, scoped messages
-4. Ensure lint and the full test suite pass locally
-5. Open a pull request describing the change and its testing
-
----
-
-## License
-
-Distributed under the MIT License. See `LICENSE` for details.
-
----
-
-<div align="center">
-
-**Freshcart** — groceries in minutes, recipes into carts, instantly.
-
-</div>
