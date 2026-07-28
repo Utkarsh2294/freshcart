@@ -473,6 +473,8 @@ freshcart/
 └── package.json                     # Monorepo root — workspaces config
 ```
 
+The storefront will be available locally with hot reload on both the frontend and backend, the admin console reachable at its dedicated route, and the app installable as a PWA directly from the browser's install prompt.
+
 ---
 
 
@@ -491,4 +493,3 @@ Login credentials (all accounts use the same password):
 - `priya.nair@freshcart.local`
 - `kabir.sheikh@freshcart.local`
 - `meera.iyer@freshcart.local`
-
