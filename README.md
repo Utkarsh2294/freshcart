@@ -10,8 +10,7 @@ A production-shaped quick-commerce platform built around a live grocery catalog,
 ![Frontend](https://img.shields.io/badge/frontend-React%2018%20%2B%20Vite-61DAFB)
 ![Backend](https://img.shields.io/badge/backend-Node.js%20%2B%20Express-339933)
 ![Database](https://img.shields.io/badge/database-PostgreSQL%2016-336791)
-![PWA](https://img.shields.io/badge/installable-PWA-5A0FC8)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
 
 </div>
 
