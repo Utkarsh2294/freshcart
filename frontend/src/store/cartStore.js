@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as cartService from '../services/cartService';
+import { applyOptimisticSwap, cartTotal } from './cartSwap';
 
 export const useCartStore = create((set, get) => ({
   items: [],
@@ -59,11 +60,16 @@ export const useCartStore = create((set, get) => ({
     return cartService.getSwapOptions(itemId);
   },
 
-  swapItem: async (itemId, newProductId) => {
+  swapItem: async (itemId, option) => {
+    const previousItems = get().items;
+    const optimisticItems = applyOptimisticSwap(previousItems, itemId, option);
+    set({ items: optimisticItems, total: cartTotal(optimisticItems) });
+
     try {
-      await cartService.swapItem(itemId, newProductId);
+      await cartService.swapItem(itemId, option.id);
       await get().fetchCart();
     } catch (err) {
+      set({ items: previousItems, total: cartTotal(previousItems) });
       console.error(err);
       throw err;
     }

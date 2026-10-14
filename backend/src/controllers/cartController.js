@@ -191,6 +191,7 @@ async function getCartItemForUser(client, itemId, userId) {
       AND c.user_id = $2
       AND c.status = 'active'
     LIMIT 1
+    FOR UPDATE OF ci
   `, [itemId, userId]);
   return rows[0] || null;
 }
@@ -310,7 +311,7 @@ export const swapItem = async (req, res, next) => {
     }
 
     const existing = await client.query(
-      'SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+      'SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2 FOR UPDATE',
       [item.cart_id, new_product_id]
     );
 

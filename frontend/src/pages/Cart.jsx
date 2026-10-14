@@ -39,7 +39,7 @@ export default function Cart() {
     const originalItems = items;
     setSwapState(state => ({ ...state, isSwapping: true }));
     try {
-      await swapItem(swapState.item._id, option.id);
+      await swapItem(swapState.item._id, option);
       addToast({ type: 'success', message: `Swapped to ${option.name}` });
       setSwapState({ isOpen: false, item: null, options: [], isLoading: false, isSwapping: false, error: '' });
     } catch (err) {
