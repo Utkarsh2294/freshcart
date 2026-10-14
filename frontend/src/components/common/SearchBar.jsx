@@ -24,6 +24,7 @@ export default function SearchBar() {
   const navigate = useNavigate();
   const wrapperRef = useRef(null);
   const recognitionRef = useRef(null);
+  const isVoiceSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   useEffect(() => {
     setQuery(searchParams.get('q') || '');
@@ -38,6 +39,8 @@ export default function SearchBar() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   const submitSearch = async (value) => {
     const trimmed = value.trim();
@@ -114,9 +117,11 @@ export default function SearchBar() {
         <button
           type="button"
           onClick={handleVoiceSearch}
-          title="Voice search"
+          disabled={!isVoiceSupported}
+          title={isVoiceSupported ? 'Voice search' : 'Voice search is unavailable in this browser'}
+          aria-label={isVoiceSupported ? 'Voice search' : 'Voice search unavailable'}
           className={`absolute inset-y-0 right-0 flex items-center pr-4 transition-colors ${
-            isListening ? 'text-[#EC4899]' : 'text-[var(--text-secondary)] hover:text-[#6366F1]'
+            isListening ? 'text-[#EC4899]' : 'text-[var(--text-secondary)] hover:text-[#6366F1] disabled:cursor-not-allowed disabled:opacity-40'
           }`}
         >
           <Mic className="h-5 w-5" />
