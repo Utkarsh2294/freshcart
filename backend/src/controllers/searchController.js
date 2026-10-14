@@ -117,7 +117,7 @@ export const understandSearchIntent = async (req, res, next) => {
         const data = await response.json();
         return res.json(data);
       }
-    } catch (e) {
+    } catch {
       // Ignore and fallback
     } finally {
       clearTimeout(timeout);

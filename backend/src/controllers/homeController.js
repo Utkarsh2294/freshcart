@@ -82,7 +82,7 @@ function headlineForReason(reasonTag) {
  * @param {Date} now
  * @returns {string} reason_tag
  */
-function getTemporalReasonTag(now) {
+export function getTemporalReasonTag(now) {
   const hour = now.getHours();
   const minutes = now.getMinutes();
   const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
@@ -90,7 +90,7 @@ function getTemporalReasonTag(now) {
   const timeInMinutes = hour * 60 + minutes;
 
   // 22:30–02:00 → late_night_munchies (wraps past midnight)
-  if (timeInMinutes >= 1350 || timeInMinutes < 240) return 'late_night_munchies';
+  if (timeInMinutes >= 1350 || timeInMinutes < 120) return 'late_night_munchies';
   // 02:00–09:00 → early_morning_essentials (pre-dawn + morning)
   if (timeInMinutes < 540) return 'early_morning_essentials';
   // 09:00–12:00 → weekday_breakfast / weekend_brunch
@@ -419,7 +419,7 @@ async function fetchStreakSignal(userId, currentReasonTag, products, categoryNam
  * @param {Array<Object|null>} candidates - all collected recommendation candidates
  * @returns {Object} the winning recommendation
  */
-function scoreAndPickBestSignal(candidates) {
+export function scoreAndPickBestSignal(candidates) {
   const viable = candidates
     .filter(c => c && c.confidence >= MIN_RECOMMENDATION_CONFIDENCE);
 
@@ -429,7 +429,11 @@ function scoreAndPickBestSignal(candidates) {
     // Primary: highest confidence first
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     // Tie-break: signal priority order (lower index = higher priority)
-    return SIGNAL_PRIORITY.indexOf(a.signal_type) - SIGNAL_PRIORITY.indexOf(b.signal_type);
+    const priority = signal => {
+      const index = SIGNAL_PRIORITY.indexOf(signal);
+      return index === -1 ? SIGNAL_PRIORITY.length : index;
+    };
+    return priority(a.signal_type) - priority(b.signal_type);
   });
 
   return viable[0];
@@ -446,7 +450,7 @@ function scoreAndPickBestSignal(candidates) {
  * @param {string} categoryName
  * @returns {Object|null}
  */
-function fetchWeatherSignal(products, categoryName) {
+function fetchWeatherSignal() {
   if (!WEATHER_SIGNAL_ENABLED) return null;
 
   // TODO: Replace this stub with actual weather API call.
@@ -472,9 +476,6 @@ function fetchEventSignal(products, categoryName) {
   const calendar = getFestivalCalendar();
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${day}`;
   const todayMs = now.getTime();
 
   for (const festival of calendar) {
@@ -530,7 +531,7 @@ export const getHomeRecommendations = async (req, res, next) => {
     const replenishmentRec = await fetchReplenishmentSignal(userId);
     const cadenceRec = fetchCadenceSignal(temporalRec.products, temporalRec.category);
     const streakRec = await fetchStreakSignal(userId, temporalRec.reason_tag, temporalRec.products, temporalRec.category);
-    const weatherRec = fetchWeatherSignal(temporalRec.products, temporalRec.category);
+    const weatherRec = fetchWeatherSignal();
     const eventRec = fetchEventSignal(temporalRec.products, temporalRec.category);
 
     // 3. Score and pick the best signal

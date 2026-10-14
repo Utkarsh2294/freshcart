@@ -116,7 +116,10 @@ export default function PramarshaBanner({
           </div>
           <button
             type="button"
-            onClick={onAddAll}
+            onClick={(event) => {
+              event.stopPropagation();
+              onAddAll?.();
+            }}
             disabled={isAdding}
             className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#0F766E] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
           >

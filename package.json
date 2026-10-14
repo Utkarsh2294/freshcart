@@ -19,6 +19,8 @@
     "test": "npm run test --workspaces --if-present",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
+    "jobs:pramarsha": "node scripts/jobs/computeCadenceAndStreaks.js",
+    "check:phase7": "node scripts/checkPhase7Data.js",
     "check:catalog": "node scripts/checkCatalogParity.js"
   }
 }
