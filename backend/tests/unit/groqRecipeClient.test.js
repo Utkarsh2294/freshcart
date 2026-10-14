@@ -22,26 +22,24 @@ const validRecipe = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.OPENROUTER_API_KEY;
-  delete process.env.KIMI_API_KEY;
-  delete process.env.KIMI_BREAKER_FAILURE_THRESHOLD;
-  delete process.env.KIMI_BREAKER_RESET_MS;
+  delete process.env.GROQ_API_KEY;
+  delete process.env.GROQ_BREAKER_FAILURE_THRESHOLD;
+  delete process.env.GROQ_BREAKER_RESET_MS;
   vi.resetModules();
 });
 
-describe("Kimi recipe client", () => {
+describe("Groq recipe client", () => {
   it("fails clearly without an API key instead of returning a fake recipe", async () => {
-    delete process.env.OPENROUTER_API_KEY;
-    delete process.env.KIMI_API_KEY;
+    delete process.env.GROQ_API_KEY;
     const { generateRecipe, RecipeGenerationError } =
-      await import("../../src/services/kimiRecipeClient.js");
+      await import("../../src/services/groqRecipeClient.js");
     await expect(
       generateRecipe("paneer butter masala", 4),
     ).rejects.toBeInstanceOf(RecipeGenerationError);
   });
 
   it("retries one malformed response and returns validated JSON", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.GROQ_API_KEY = "test-key";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -57,7 +55,7 @@ describe("Kimi recipe client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { generateRecipe } =
-      await import("../../src/services/kimiRecipeClient.js");
+      await import("../../src/services/groqRecipeClient.js");
     const result = await generateRecipe("paneer butter masala", 4, [
       "vegetarian",
       "gluten-free",
@@ -66,7 +64,7 @@ describe("Kimi recipe client", () => {
     expect(result.title).toBe(validRecipe.title);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(request.model).toBe("moonshotai/kimi-k3");
+    expect(request.model).toBe("openai/gpt-oss-120b");
     expect(request.messages[0].content).toContain("vegetarian, gluten-free");
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(
       "Bearer test-key",
@@ -74,19 +72,19 @@ describe("Kimi recipe client", () => {
   });
 
   it("opens the circuit after repeated network failures and fails fast", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
-    process.env.KIMI_BREAKER_FAILURE_THRESHOLD = "2";
-    process.env.KIMI_BREAKER_RESET_MS = "60000";
+    process.env.GROQ_API_KEY = "test-key";
+    process.env.GROQ_BREAKER_FAILURE_THRESHOLD = "2";
+    process.env.GROQ_BREAKER_RESET_MS = "60000";
     const fetchMock = vi.fn().mockRejectedValue(new Error("network blocked"));
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const { generateRecipe, getKimiMetrics } =
-      await import("../../src/services/kimiRecipeClient.js");
+    const { generateRecipe, getGroqMetrics } =
+      await import("../../src/services/groqRecipeClient.js");
     await expect(generateRecipe("dal", 2)).rejects.toThrow(
       "Unable to generate",
     );
-    expect(getKimiMetrics()).toMatchObject({
+    expect(getGroqMetrics()).toMatchObject({
       failures: 2,
       breaker_state: "open",
     });

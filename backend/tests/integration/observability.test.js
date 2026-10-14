@@ -10,7 +10,7 @@ describe("Production observability", () => {
 
     expect(response.headers["content-type"]).toContain("text/plain");
     expect(response.text).toContain("freshcart_http_requests_total");
-    expect(response.text).toContain("freshcart_kimi_calls_total");
+    expect(response.text).toContain("freshcart_groq_calls_total");
     expect(response.text).toContain("freshcart_recipe_cache_hit_ratio");
   });
 

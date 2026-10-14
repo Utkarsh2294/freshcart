@@ -2,7 +2,7 @@
  * controllers/cookThisController.js
  *
  * Handles POST /ai/cook-this/generate. Cache-first: checks recipe_cache
- * before ever calling kimiRecipeClient. Returns the same response shape
+ * before ever calling groqRecipeClient. Returns the same response shape
  * regardless of cache hit or miss — the frontend never needs to know which
  * path it took.
  *
@@ -15,9 +15,9 @@
 import Joi from "joi";
 import {
   generateRecipe,
-  getKimiMetrics,
+  getGroqMetrics,
   RecipeGenerationError,
-} from "../services/kimiRecipeClient.js";
+} from "../services/groqRecipeClient.js";
 import { pool } from "../config/database.js";
 import { matchIngredientsToProducts } from "../services/ingredientMatcherService.js";
 import { featureFlags } from "../config/featureFlags.js";
@@ -89,7 +89,7 @@ async function cacheRecipe(dishName, servings, recipe) {
   // to its own caller correctly (just not persisted twice).
   await pool.query(
     `INSERT INTO recipe_cache (dish_name, servings, title, steps, ingredients, source)
-     VALUES ($1, $2, $3, $4, $5, 'kimi_api')
+     VALUES ($1, $2, $3, $4, $5, 'groq_api')
      ON CONFLICT (dish_name, servings) DO NOTHING`,
     [
       dishName,
@@ -155,7 +155,7 @@ async function generateRecipeHandler(req, res) {
       title: recipe.title,
       steps: recipe.steps,
       ingredients: recipe.ingredients,
-      source: "kimi_api",
+      source: "groq_api",
     });
   } catch (err) {
     if (err instanceof RecipeGenerationError) {
@@ -185,7 +185,7 @@ async function generateRecipeHandler(req, res) {
 function getCookThisMetrics() {
   const requests = cacheMetrics.hits + cacheMetrics.misses;
   return {
-    kimi: getKimiMetrics(),
+    groq: getGroqMetrics(),
     recipe_cache: {
       hits: cacheMetrics.hits,
       misses: cacheMetrics.misses,

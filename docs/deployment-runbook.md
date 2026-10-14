@@ -2,7 +2,7 @@
 
 ## Required configuration
 
-Copy `.env.example` to `.env` on the deployment host and set strong `POSTGRES_PASSWORD`, `JWT_SECRET`, and `JWT_REFRESH_SECRET` values. Set `CORS_ORIGINS` to the public origin. Cook with AI additionally requires `OPENROUTER_API_KEY`. Generate VAPID keys with `npx web-push generate-vapid-keys`; put the private key only in the host secret environment and use the same public key for `VAPID_PUBLIC_KEY` during the frontend image build.
+Copy `.env.example` to `.env` on the deployment host and set strong `POSTGRES_PASSWORD`, `JWT_SECRET`, and `JWT_REFRESH_SECRET` values. Set `CORS_ORIGINS` to the public origin. Cook with AI additionally requires `GROQ_API_KEY`. Generate VAPID keys with `npx web-push generate-vapid-keys`; put the private key only in the host secret environment and use the same public key for `VAPID_PUBLIC_KEY` during the frontend image build.
 
 ## First deployment
 

@@ -184,7 +184,7 @@ Each module below ships independently behind its own feature flag — any can be
 | 2   | **Hands-Free Cooking Mode**               | `HANDS_FREE_COOKING`        | Full-screen, swipe-through step view with large text, screen-wake-lock, and optional read-aloud guidance                                                   |
 | 3   | **Weekly Meal Planner**                   | `WEEKLY_MEAL_PLANNER`       | Generates a full week of varied, non-repeating dishes on request and consolidates every ingredient across the week into a single, deduplicated cart        |
 | 4   | **Nutrition & Cost Card**                 | `NUTRITION_COST_CARD`       | Per-recipe calorie, protein, and total cost breakdown scaled to servings                                                                                   |
-| 5   | **Dietary & Allergy Filters**             | `DIETARY_FILTERS`           | Applies all active dietary tags to Kimi prompts, catalog matching, and cart swap suggestions                                                               |
+| 5   | **Dietary & Allergy Filters**             | `DIETARY_FILTERS`           | Applies all active dietary tags to Groq prompts, catalog matching, and cart swap suggestions                                                               |
 | 6   | **Social Proof & Gamification**           | `SOCIAL_PROOF_GAMIFICATION` | "X people nearby ordered this today" signals and streak badges for repeat AI-cooked recipes                                                                |
 | 7   | **Hands-Free Quick-Add**                  | `VOICE_QUICK_ADD`           | Direct spoken commands ("add two litres of milk and a loaf of bread") parsed and matched instantly, with a confirmation step before anything hits the cart |
 | 8   | **Push Notifications & PWA Enhancements** | `PUSH_NOTIFICATIONS_PWA`    | Creates a real browser Push subscription using `VITE_VAPID_PUBLIC_KEY`, then supports order-status, back-in-stock, and price-drop preferences              |
@@ -486,11 +486,11 @@ The storefront will be available locally with hot reload on both the frontend an
 ## Rev 4 changes from the original Rev 2 blueprint
 
 - Browser Web Speech replaces self-hosted speech-to-text; voice audio is never uploaded.
-- Kimi K3 through OpenRouter replaces the old recipe model/service and is the only third-party AI call. It is cache-first, rate-limited, timed out, retried once, and circuit-broken.
+- Groq with `openai/gpt-oss-120b` powers recipe generation and is the only third-party AI call. It is cache-first, rate-limited, timed out, retried once, and circuit-broken.
 - Ingredient matching, pack selection, recommendation scoring, and intent parsing remain deterministic or self-hosted.
 - Pramarsha is consumed through its recommendation boundary; its schema and mining implementation are not modified.
 - The production frontend is a static, cache-busted Nginx PWA rather than a Vite development server.
-- Phase 8 modules are independently flagged. VAPID and OpenRouter secrets are injected at deployment time and are never committed.
+- Phase 8 modules are independently flagged. VAPID and Groq secrets are injected at deployment time and are never committed.
 
 See [the deployment runbook](docs/deployment-runbook.md) and [load-test report](docs/load-test-report.md) for production verification.
 

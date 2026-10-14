@@ -23,10 +23,10 @@ export function getPrometheusMetrics(req, res) {
     );
   }
 
-  const { kimi, recipe_cache: cache } = getCookThisMetrics();
-  lines.push(`freshcart_kimi_calls_total ${kimi.calls}`);
-  lines.push(`freshcart_kimi_failures_total ${kimi.failures}`);
-  lines.push(`freshcart_kimi_reported_cost_total ${kimi.reported_cost}`);
+  const { groq, recipe_cache: cache } = getCookThisMetrics();
+  lines.push(`freshcart_groq_calls_total ${groq.calls}`);
+  lines.push(`freshcart_groq_failures_total ${groq.failures}`);
+  lines.push(`freshcart_groq_reported_cost_total ${groq.reported_cost}`);
   lines.push(`freshcart_recipe_cache_hits_total ${cache.hits}`);
   lines.push(`freshcart_recipe_cache_misses_total ${cache.misses}`);
   lines.push(`freshcart_recipe_cache_hit_ratio ${cache.hit_rate}`);

@@ -3,15 +3,15 @@ import {
   recipeStepActions,
 } from "freshcart-shared/schemas/recipe.schema";
 
-const KIMI_BASE_URL =
-  process.env.KIMI_BASE_URL || "https://openrouter.ai/api/v1";
-const KIMI_MODEL = process.env.KIMI_MODEL || "moonshotai/kimi-k3";
-const KIMI_API_KEY = process.env.OPENROUTER_API_KEY || process.env.KIMI_API_KEY;
-const KIMI_TIMEOUT_MS = Number(process.env.KIMI_TIMEOUT_MS || 12000);
+const GROQ_BASE_URL =
+  process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1";
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_TIMEOUT_MS = Number(process.env.GROQ_TIMEOUT_MS || 12000);
 const BREAKER_FAILURE_THRESHOLD = Number(
-  process.env.KIMI_BREAKER_FAILURE_THRESHOLD || 3,
+  process.env.GROQ_BREAKER_FAILURE_THRESHOLD || 3,
 );
-const BREAKER_RESET_MS = Number(process.env.KIMI_BREAKER_RESET_MS || 30000);
+const BREAKER_RESET_MS = Number(process.env.GROQ_BREAKER_RESET_MS || 30000);
 
 const metrics = {
   calls: 0,
@@ -54,26 +54,26 @@ Schema:
 }`;
 }
 
-async function callKimi(prompt) {
+async function callGroq(prompt) {
   if (breakerState === "open") {
     if (Date.now() - breakerOpenedAt < BREAKER_RESET_MS) {
-      throw new RecipeGenerationError("Kimi circuit breaker is open");
+      throw new RecipeGenerationError("Groq circuit breaker is open");
     }
     breakerState = "half_open";
   }
 
   const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), KIMI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
   try {
-    const response = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${KIMI_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: KIMI_MODEL,
+        model: GROQ_MODEL,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         temperature: 0.3,
@@ -83,7 +83,7 @@ async function callKimi(prompt) {
 
     if (!response.ok) {
       throw new RecipeGenerationError(
-        `Kimi returned ${response.status}`,
+        `Groq returned ${response.status}`,
         await response.text(),
       );
     }
@@ -99,7 +99,7 @@ async function callKimi(prompt) {
     breakerState = "closed";
     console.info(
       JSON.stringify({
-        event: "kimi_call",
+        event: "groq_call",
         status: "success",
         latency_ms: latencyMs,
         prompt_tokens: Number(body.usage?.prompt_tokens || 0),
@@ -120,7 +120,7 @@ async function callKimi(prompt) {
     }
     console.warn(
       JSON.stringify({
-        event: "kimi_call",
+        event: "groq_call",
         status: "failure",
         latency_ms: latencyMs,
         breaker_state: breakerState,
@@ -138,7 +138,7 @@ function parseAndValidate(raw) {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new RecipeGenerationError("Kimi returned malformed JSON", error);
+    throw new RecipeGenerationError("Groq returned malformed JSON", error);
   }
 
   const { error, value } = structuredRecipeSchema.validate(parsed, {
@@ -146,22 +146,22 @@ function parseAndValidate(raw) {
     stripUnknown: true,
   });
   if (error)
-    throw new RecipeGenerationError("Kimi recipe failed validation", error);
+    throw new RecipeGenerationError("Groq recipe failed validation", error);
   return value;
 }
 
 export async function generateRecipe(dishName, servings, dietaryTags = []) {
-  if (!KIMI_API_KEY) {
-    throw new RecipeGenerationError("Kimi API key is not configured");
+  if (!GROQ_API_KEY) {
+    throw new RecipeGenerationError("Groq API key is not configured");
   }
 
   const prompt = buildPrompt(dishName, servings, dietaryTags);
   try {
-    return parseAndValidate(await callKimi(prompt));
+    return parseAndValidate(await callGroq(prompt));
   } catch (firstError) {
     try {
       return parseAndValidate(
-        await callKimi(
+        await callGroq(
           `${prompt}\nThe previous response was invalid. Return strict JSON only.`,
         ),
       );
@@ -174,7 +174,7 @@ export async function generateRecipe(dishName, servings, dietaryTags = []) {
   }
 }
 
-export function getKimiMetrics() {
+export function getGroqMetrics() {
   return {
     ...metrics,
     average_latency_ms: metrics.calls

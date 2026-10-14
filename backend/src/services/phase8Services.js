@@ -1,19 +1,23 @@
-import { pool } from '../config/database.js';
-import { matchIngredientsToProducts } from './ingredientMatcherService.js';
-import { generateRecipe } from './kimiRecipeClient.js';
+import { pool } from "../config/database.js";
+import { matchIngredientsToProducts } from "./ingredientMatcherService.js";
+import { generateRecipe } from "./groqRecipeClient.js";
 
 const DAY_SEEDS = [
-  ['poha', 'idli', 'masala omelette'],
-  ['dal tadka', 'paneer bhurji', 'veg pulao'],
-  ['rajma rice', 'chicken curry', 'veg noodles'],
-  ['chole', 'egg curry', 'lemon rice'],
-  ['paneer butter masala', 'fish curry', 'khichdi'],
-  ['veg biryani', 'chicken biryani', 'mushroom masala'],
-  ['dosa', 'paratha', 'tomato rice'],
+  ["poha", "idli", "masala omelette"],
+  ["dal tadka", "paneer bhurji", "veg pulao"],
+  ["rajma rice", "chicken curry", "veg noodles"],
+  ["chole", "egg curry", "lemon rice"],
+  ["paneer butter masala", "fish curry", "khichdi"],
+  ["veg biryani", "chicken biryani", "mushroom masala"],
+  ["dosa", "paratha", "tomato rice"],
 ];
 
 function normalizeText(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function ingredientKey(item) {
@@ -22,13 +26,14 @@ function ingredientKey(item) {
 
 export async function fetchCatalogProducts({ dietaryTags = [] } = {}) {
   const params = [];
-  let dietaryClause = '';
+  let dietaryClause = "";
   if (dietaryTags.length) {
     params.push(dietaryTags);
     dietaryClause = `AND p.dietary_tags @> $${params.length}::text[]`;
   }
 
-  const { rows } = await pool.query(`
+  const { rows } = await pool.query(
+    `
     SELECT
       p.id,
       p.name,
@@ -47,48 +52,52 @@ export async function fetchCatalogProducts({ dietaryTags = [] } = {}) {
     WHERE p.stock_qty > 0
       ${dietaryClause}
     ORDER BY p.name ASC
-  `, params);
+  `,
+    params,
+  );
   return rows;
 }
 
 export async function getUserDietaryTags(userId) {
   const { rows } = await pool.query(
-    'SELECT dietary_tags FROM user_dietary_profiles WHERE user_id = $1',
-    [userId]
+    "SELECT dietary_tags FROM user_dietary_profiles WHERE user_id = $1",
+    [userId],
   );
   return rows[0]?.dietary_tags || [];
 }
 
 export async function filterMatchesWithPantry(userId, matches) {
   const { rows } = await pool.query(
-    'SELECT ingredient_name FROM user_pantry WHERE user_id = $1',
-    [userId]
+    "SELECT ingredient_name FROM user_pantry WHERE user_id = $1",
+    [userId],
   );
-  const pantry = new Set(rows.map(row => normalizeText(row.ingredient_name)));
+  const pantry = new Set(rows.map((row) => normalizeText(row.ingredient_name)));
   const skipped = [];
   const filtered = matches.map((match) => {
     const name = normalizeText(match.ingredient?.name);
     const inPantry = pantry.has(name);
     if (inPantry) skipped.push(match.ingredient.name);
     return inPantry
-      ? { ...match, selected: false, skipped_reason: 'already_in_pantry' }
+      ? { ...match, selected: false, skipped_reason: "already_in_pantry" }
       : match;
   });
 
   return {
     matches: filtered,
-    pantry_note: skipped.length ? `${skipped.length} items skipped - already in your pantry` : '',
+    pantry_note: skipped.length
+      ? `${skipped.length} items skipped - already in your pantry`
+      : "",
     skipped,
   };
 }
 
 export async function computeNutritionAndCost(ingredients, matches, servings) {
-  const names = ingredients.map(item => normalizeText(item.name));
+  const names = ingredients.map((item) => normalizeText(item.name));
   const { rows } = await pool.query(
-    'SELECT * FROM nutrition_lookup WHERE ingredient_name = ANY($1::text[])',
-    [names]
+    "SELECT * FROM nutrition_lookup WHERE ingredient_name = ANY($1::text[])",
+    [names],
   );
-  const lookup = new Map(rows.map(row => [row.ingredient_name, row]));
+  const lookup = new Map(rows.map((row) => [row.ingredient_name, row]));
 
   let calories = 0;
   let protein = 0;
@@ -100,9 +109,11 @@ export async function computeNutritionAndCost(ingredients, matches, servings) {
     protein += (qty / 100) * Number(nutrition.protein_per_100g);
   }
 
-  const cost = matches.reduce((sum, match) => (
-    sum + Number(match.product?.price || 0) * Number(match.quantity || 0)
-  ), 0);
+  const cost = matches.reduce(
+    (sum, match) =>
+      sum + Number(match.product?.price || 0) * Number(match.quantity || 0),
+    0,
+  );
 
   return {
     servings,
@@ -123,9 +134,10 @@ export async function buildWeeklyMealPlan({ userId, preferences, days = 7 }) {
 
   for (let day = 0; day < Math.min(7, Math.max(5, days)); day += 1) {
     const seed = DAY_SEEDS[day % DAY_SEEDS.length];
-    const dish = seed[(day + (preferences?.cuisine_tags?.length || 0)) % seed.length];
+    const dish =
+      seed[(day + (preferences?.cuisine_tags?.length || 0)) % seed.length];
     const recipe = await generateRecipe(
-      `${preferences?.veg_non_veg || ''} ${preferences?.cuisine_tags?.join(' ') || ''} ${dish}`.trim(),
+      `${preferences?.veg_non_veg || ""} ${preferences?.cuisine_tags?.join(" ") || ""} ${dish}`.trim(),
       2,
       dietaryTags,
     );
@@ -141,11 +153,16 @@ export async function buildWeeklyMealPlan({ userId, preferences, days = 7 }) {
 
   const consolidatedIngredients = [...merged.values()];
   const matches = matchIngredientsToProducts(consolidatedIngredients, products);
-  return { recipes, consolidated_ingredients: consolidatedIngredients, matches };
+  return {
+    recipes,
+    consolidated_ingredients: consolidatedIngredients,
+    matches,
+  };
 }
 
 export async function getPredictiveReorderRail(userId) {
-  const { rows } = await pool.query(`
+  const { rows } = await pool.query(
+    `
     WITH purchases AS (
       SELECT
         p.id,
@@ -181,12 +198,14 @@ export async function getPredictiveReorderRail(userId) {
       ABS(EXTRACT(EPOCH FROM (NOW() - last_ordered_at)) / 86400.0 - COALESCE(avg_days_between, 7)) ASC,
       purchase_count DESC
     LIMIT 6
-  `, [userId]);
+  `,
+    [userId],
+  );
 
-  return rows.map(row => ({
+  return rows.map((row) => ({
     ...row,
     reason: row.avg_days_between
       ? `Usually every ${Math.max(1, Math.round(row.avg_days_between))} days`
-      : 'A frequent repeat from your orders',
+      : "A frequent repeat from your orders",
   }));
 }

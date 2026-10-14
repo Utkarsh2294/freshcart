@@ -25,14 +25,14 @@ Authorization: <as per existing auth scheme>
 }
 ```
 
-| Field       | Type    | Constraints                          |
-|-------------|---------|---------------------------------------|
-| `dish_name` | string  | 1–200 chars, required                 |
-| `servings`  | integer | 1–50, required                        |
+| Field       | Type    | Constraints           |
+| ----------- | ------- | --------------------- |
+| `dish_name` | string  | 1–200 chars, required |
+| `servings`  | integer | 1–50, required        |
 
 ## Response — success (200)
 
-Identical shape whether the recipe came from cache or from a live Kimi K3
+Identical shape whether the recipe came from cache or from a live Groq
 call. The frontend never branches on this — `source` is informational only.
 
 ```json
@@ -49,22 +49,22 @@ call. The frontend never branches on this — `source` is informational only.
     { "name": "large onion, chopped", "qty": 2, "unit": null },
     { "name": "tomato purée", "qty": 200, "unit": "ml" }
   ],
-  "source": "kimi_api",
+  "source": "groq_api",
   "confidence": null
 }
 ```
 
-| Field         | Type                | Notes                                                        |
-|---------------|---------------------|----------------------------------------------------------------|
-| `title`       | string              |                                                                  |
-| `steps`       | string[]            | Ordered instructions                                            |
-| `ingredients` | array of objects    | `{ name: string, qty: number, unit: string \| null }`           |
-| `source`      | `"kimi_api"` \| `"cache"` | Which path served this response                            |
-| `confidence`  | number \| null (optional) | Reserved for future use; Kimi K3 doesn't return a confidence score today, so this is currently always `null`/omitted. Present in the contract so the frontend can start rendering it without a breaking change later. |
+| Field         | Type                      | Notes                                                                                                                                                                                                              |
+| ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `title`       | string                    |                                                                                                                                                                                                                    |
+| `steps`       | string[]                  | Ordered instructions                                                                                                                                                                                               |
+| `ingredients` | array of objects          | `{ name: string, qty: number, unit: string \| null }`                                                                                                                                                              |
+| `source`      | `"groq_api"` \| `"cache"` | Which path served this response                                                                                                                                                                                    |
+| `confidence`  | number \| null (optional) | Reserved for future use; Groq doesn't return a confidence score today, so this is currently always `null`/omitted. Present in the contract so the frontend can start rendering it without a breaking change later. |
 
 ## Response — graceful failure (422)
 
-Returned when Kimi's output is missing, malformed, or fails schema
+Returned when Groq's output is missing, malformed, or fails schema
 validation after the one automatic retry. Never a crash, never an empty
 cart — the frontend shows a "try rephrasing" state.
 
@@ -99,11 +99,11 @@ cart — the frontend shows a "try rephrasing" state.
 
 - Cache key: `(normalized dish_name, servings)`, where normalization is
   trim + lowercase + collapse internal whitespace.
-- The cache is checked **before** `kimiRecipeClient` is ever invoked.
+- The cache is checked **before** `groqRecipeClient` is ever invoked.
 - A successful live generation is written to `recipe_cache` with
-  `source = 'kimi_api'` before the response is returned.
-- A cache hit returns `source: "cache"` and never touches the Kimi API.
-- Repeat requests for the same dish + servings only call the Kimi API once
+  `source = 'groq_api'` before the response is returned.
+- A cache hit returns `source: "cache"` and never touches the Groq API.
+- Repeat requests for the same dish + servings only call the Groq API once
   — verified by checking for a second outbound call/timing gap on the
   second request (see manual test log).
 
@@ -113,5 +113,5 @@ cart — the frontend shows a "try rephrasing" state.
 - Quantity/unit conversion math (Phase 5)
 - Cart insertion (Phase 5)
 - Any recipe knowledge base, FAISS index, or fine-tuned model — this phase
-  fully replaces that approach; recipe generation now comes from Kimi K3
+  fully replaces that approach; recipe generation now comes from Groq
   only, cached in Postgres.

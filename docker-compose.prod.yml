@@ -40,10 +40,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      KIMI_MODEL: ${KIMI_MODEL:-moonshotai/kimi-k3}
-      KIMI_BASE_URL: ${KIMI_BASE_URL:-https://openrouter.ai/api/v1}
-      KIMI_TIMEOUT_MS: ${KIMI_TIMEOUT_MS:-12000}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_BASE_URL: ${GROQ_BASE_URL:-https://api.groq.com/openai/v1}
+      GROQ_TIMEOUT_MS: ${GROQ_TIMEOUT_MS:-12000}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@freshcart.local}

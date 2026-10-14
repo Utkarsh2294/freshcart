@@ -8,13 +8,13 @@ export const options = {
   },
   thresholds: {
     http_req_failed: ["rate<0.05"],
-    kimi_latency: ["p(95)<15000"],
+    groq_latency: ["p(95)<15000"],
     matching_latency: ["p(95)<1500"],
   },
 };
 
 const base = __ENV.BASE_URL || "http://localhost:4000/api";
-const kimiLatency = new Trend("kimi_latency");
+const groqLatency = new Trend("groq_latency");
 const matchingLatency = new Trend("matching_latency");
 
 export function setup() {
@@ -42,7 +42,7 @@ export default function ({ token }) {
     JSON.stringify({ dish_name: dish, servings: 4 }),
     { headers },
   );
-  kimiLatency.add(generated.timings.duration);
+  groqLatency.add(generated.timings.duration);
   check(generated, {
     "recipe generated or cached": (response) => response.status === 200,
   });
