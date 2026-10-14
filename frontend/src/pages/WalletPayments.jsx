@@ -16,7 +16,7 @@ export default function WalletPayments() {
 
   useEffect(() => {
     fetchWallet();
-    fetchReferralCode();
+    if (featureFlags.referralWallet) fetchReferralCode();
   }, [fetchWallet, fetchReferralCode]);
 
   const handleCopy = () => {

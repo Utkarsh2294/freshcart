@@ -13,8 +13,12 @@ export class RecipeGenerationError extends Error {
   }
 }
 
-function buildPrompt(dishName, servings) {
+function buildPrompt(dishName, servings, dietaryTags = []) {
+  const dietaryInstruction = dietaryTags.length
+    ? ` The recipe must satisfy all dietary requirements: ${dietaryTags.join(', ')}.`
+    : '';
   return `Generate one practical recipe for "${dishName}" for ${servings} servings.
+${dietaryInstruction}
 Return only valid JSON, no markdown or commentary. Use English and grocery-search-friendly ingredient names.
 Schema:
 {
@@ -74,12 +78,12 @@ function parseAndValidate(raw) {
   return value;
 }
 
-export async function generateRecipe(dishName, servings) {
+export async function generateRecipe(dishName, servings, dietaryTags = []) {
   if (!KIMI_API_KEY) {
     throw new RecipeGenerationError('Kimi API key is not configured');
   }
 
-  const prompt = buildPrompt(dishName, servings);
+  const prompt = buildPrompt(dishName, servings, dietaryTags);
   try {
     return parseAndValidate(await callKimi(prompt));
   } catch (firstError) {

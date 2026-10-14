@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Check, ChevronDown, Clock, Loader2, Maximize2, PackageCheck, RefreshCw, ShoppingBag, Sparkles, Users, Volume2, X } from 'lucide-react';
 import * as cookThisService from '../services/cookThisService';
@@ -34,6 +34,38 @@ export default function RecipeResult() {
   const [cookingMode, setCookingMode] = useState(false);
   const [cookingStep, setCookingStep] = useState(0);
   const [language, setLanguage] = useState(() => localStorage.getItem('freshcart_recipe_language') || 'en');
+  const wakeLockRef = useRef(null);
+
+  useEffect(() => {
+    if (!cookingMode) {
+      wakeLockRef.current?.release?.();
+      wakeLockRef.current = null;
+      return undefined;
+    }
+
+    let active = true;
+    const acquireWakeLock = async () => {
+      if (!active || document.visibilityState !== 'visible') return;
+      try {
+        wakeLockRef.current = await navigator.wakeLock?.request?.('screen') || null;
+      } catch {
+        wakeLockRef.current = null;
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !wakeLockRef.current) acquireWakeLock();
+    };
+
+    acquireWakeLock();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', handleVisibility);
+      wakeLockRef.current?.release?.();
+      wakeLockRef.current = null;
+      window.speechSynthesis?.cancel?.();
+    };
+  }, [cookingMode]);
 
   const selectedMatches = useMemo(() => {
     return localMatches.filter(match => match.product && selected.has(match.product.id));
@@ -132,13 +164,8 @@ export default function RecipeResult() {
     onUnmatchedTerm: (info) => console.info('[recipe-i18n:fallback]', info),
   });
 
-  const openCookingMode = async () => {
+  const openCookingMode = () => {
     setCookingMode(true);
-    try {
-      await navigator.wakeLock?.request?.('screen');
-    } catch {
-      // Wake lock is best-effort; the full-screen cooking view still works.
-    }
   };
 
   return (

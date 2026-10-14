@@ -91,7 +91,13 @@ async function generateRecipeHandler(req, res) {
   const dishName = normalizeDishName(rawDishName);
 
   try {
-    const cached = await findCachedRecipe(dishName, servings);
+    const dietaryTags = featureFlags.dietaryFilters && req.user?.id
+      ? await getUserDietaryTags(req.user.id)
+      : [];
+    const cacheKey = dietaryTags.length
+      ? `${dishName} | dietary:${[...dietaryTags].sort().join(',')}`
+      : dishName;
+    const cached = await findCachedRecipe(cacheKey, servings);
     if (cached) {
       return res.status(200).json({
         title: cached.title,
@@ -102,8 +108,8 @@ async function generateRecipeHandler(req, res) {
       });
     }
 
-    const recipe = await generateRecipe(dishName, servings);
-    await cacheRecipe(dishName, servings, recipe);
+    const recipe = await generateRecipe(dishName, servings, dietaryTags);
+    await cacheRecipe(cacheKey, servings, recipe);
 
     return res.status(200).json({
       title: recipe.title,

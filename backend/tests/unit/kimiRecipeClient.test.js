@@ -40,12 +40,13 @@ describe('Kimi recipe client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { generateRecipe } = await import('../../src/services/kimiRecipeClient.js');
-    const result = await generateRecipe('paneer butter masala', 4);
+    const result = await generateRecipe('paneer butter masala', 4, ['vegetarian', 'gluten-free']);
 
     expect(result.title).toBe(validRecipe.title);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(request.model).toBe('moonshotai/kimi-k3');
+    expect(request.messages[0].content).toContain('vegetarian, gluten-free');
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer test-key');
   });
 });

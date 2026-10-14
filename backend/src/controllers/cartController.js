@@ -1,5 +1,6 @@
 import { pool } from '../config/database.js';
 import { multiply, subtract } from 'freshcart-shared/money';
+import { featureFlags } from '../config/featureFlags.js';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -220,7 +221,16 @@ async function resolveSwapCategoryIds(client, categoryId) {
   return siblingRows.map(row => row.id);
 }
 
-async function getSwapOptionsForItem(client, item, limit = 4) {
+async function getDietaryTags(client, userId) {
+  if (!featureFlags.dietaryFilters) return [];
+  const { rows } = await client.query(
+    'SELECT dietary_tags FROM user_dietary_profiles WHERE user_id = $1',
+    [userId]
+  );
+  return rows[0]?.dietary_tags || [];
+}
+
+async function getSwapOptionsForItem(client, item, limit = 4, dietaryTags = []) {
   const categoryIds = await resolveSwapCategoryIds(client, item.category_id);
   const { rows } = await client.query(`
     SELECT
@@ -243,10 +253,11 @@ async function getSwapOptionsForItem(client, item, limit = 4) {
     WHERE p.category_id = ANY($1::int[])
       AND p.id <> $2
       AND p.stock_qty > 0
+      AND ($4::text[] IS NULL OR p.dietary_tags @> $4::text[])
     GROUP BY p.id, c.name, b.name, ps.final_score
     ORDER BY COALESCE(ps.final_score, 0.55) DESC, rating DESC, p.stock_qty DESC, p.name ASC
     LIMIT $3
-  `, [categoryIds, item.product_id, limit]);
+  `, [categoryIds, item.product_id, limit, dietaryTags.length ? dietaryTags : null]);
 
   return rows.map(row => ({
     ...row,
@@ -265,7 +276,8 @@ export const getSwapOptions = async (req, res, next) => {
       return res.status(404).json({ error: 'Cart item not found' });
     }
 
-    const options = await getSwapOptionsForItem(client, item);
+    const dietaryTags = await getDietaryTags(client, req.user.id);
+    const options = await getSwapOptionsForItem(client, item, 4, dietaryTags);
     return res.json({
       item: {
         id: item.id,
@@ -303,7 +315,8 @@ export const swapItem = async (req, res, next) => {
       return res.status(400).json({ error: 'Choose a different product to swap' });
     }
 
-    const options = await getSwapOptionsForItem(client, item, 12);
+    const dietaryTags = await getDietaryTags(client, req.user.id);
+    const options = await getSwapOptionsForItem(client, item, 12, dietaryTags);
     const selected = options.find(option => String(option.product_id) === String(new_product_id));
     if (!selected) {
       await client.query('ROLLBACK');

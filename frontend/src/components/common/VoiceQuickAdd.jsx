@@ -32,9 +32,17 @@ export default function VoiceQuickAdd() {
     recognition.onresult = async (event) => {
       const text = event.results?.[0]?.[0]?.transcript || '';
       setTranscript(text);
-      const data = await phase8Service.parseVoiceQuickAdd(text);
-      setMatches(data.matches || []);
-      setIsOpen(true);
+      try {
+        const data = await phase8Service.parseVoiceQuickAdd(text);
+        setMatches(data.matches || []);
+        setIsOpen(true);
+      } catch {
+        addToast({ type: 'error', message: 'Could not parse that quick-add request.' });
+      }
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+      addToast({ type: 'error', message: 'Voice quick-add could not hear that request.' });
     };
     recognition.start();
   };
@@ -54,8 +62,7 @@ export default function VoiceQuickAdd() {
     <>
       <button
         type="button"
-        onMouseDown={startListening}
-        onTouchStart={startListening}
+        onPointerDown={startListening}
         className={`fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ${isListening ? 'bg-red-500' : 'bg-[#14B8A6]'}`}
         aria-label="Voice quick add"
       >

@@ -16,7 +16,7 @@ import { optionalAuth, requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/ai/cook-this/generate', generateRecipeHandler);
+router.post('/ai/cook-this/generate', optionalAuth, generateRecipeHandler);
 router.post('/ai/cook-this/match', optionalAuth, matchIngredientsHandler);
 router.post('/ai/cook-this/add-to-cart', requireAuth, addMatchedItemsHandler);
 

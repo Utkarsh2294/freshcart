@@ -6,11 +6,11 @@ export const getWallet = async () => {
 };
 
 export const getMyReferralCode = async () => {
-  const { data } = await api.get('/wallet/referral');
+  const { data } = await api.get('/referral/my-code');
   return data;
 };
 
 export const redeemReferralCode = async (code) => {
-  const { data } = await api.post('/wallet/redeem', { code });
+  const { data } = await api.post('/referral/redeem', { code });
   return data;
 };

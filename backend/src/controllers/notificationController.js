@@ -5,7 +5,7 @@ import { requireFeature } from '../config/featureFlags.js';
 
 if (config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    'mailto:support@freshcart.local',
+    config.VAPID_SUBJECT,
     config.VAPID_PUBLIC_KEY,
     config.VAPID_PRIVATE_KEY
   );

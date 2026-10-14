@@ -170,18 +170,20 @@ This surface is intentionally, visually distinct from every other recommendation
 
 Each module below ships independently behind its own feature flag — any can be enabled, disabled, or shipped on its own timeline without affecting the others.
 
-| # | Module | What it does |
-|---|---|---|
-| 1 | **Smart Pantry** | Tracks what a shopper already has and skips those items during auto-cart, with a clear "already in your pantry" note |
-| 2 | **Hands-Free Cooking Mode** | Full-screen, swipe-through step view with large text, screen-wake-lock, and optional read-aloud guidance |
-| 3 | **Weekly Meal Planner** | Generates a full week of varied, non-repeating dishes on request and consolidates every ingredient across the week into a single, deduplicated cart |
-| 4 | **Nutrition & Cost Card** | Per-recipe calorie, protein, and total cost breakdown scaled to servings |
-| 5 | **Dietary & Allergy Filters** | Vegetarian/non-vegetarian and dietary-tag filtering applied across recipe generation and swap suggestions alike |
-| 6 | **Social Proof & Gamification** | "X people nearby ordered this today" signals and streak badges for repeat AI-cooked recipes |
-| 7 | **Hands-Free Quick-Add** | Direct spoken commands ("add two litres of milk and a loaf of bread") parsed and matched instantly, with a confirmation step before anything hits the cart |
-| 8 | **Push Notifications & PWA Enhancements** | Real push delivery for order status, back-in-stock, and price-drop alerts, plus a full notification-preferences center |
-| 9 | **Predictive Reorder Feed** | A "you might need these" rail driven by purchase cadence — distinct from, and coexisting alongside, the Pramarsha surface |
-| 10 | **Referral & Cashback Wallet** | Full native-share referral flow, dual-sided crediting, wallet transaction history, and admin goodwill credits |
+| # | Module | Server / client flag suffix | What it does |
+|---|---|---|---|
+| 1 | **Smart Pantry** | `SMART_PANTRY` | Tracks what a shopper already has and skips those items during auto-cart, with a clear "already in your pantry" note |
+| 2 | **Hands-Free Cooking Mode** | `HANDS_FREE_COOKING` | Full-screen, swipe-through step view with large text, screen-wake-lock, and optional read-aloud guidance |
+| 3 | **Weekly Meal Planner** | `WEEKLY_MEAL_PLANNER` | Generates a full week of varied, non-repeating dishes on request and consolidates every ingredient across the week into a single, deduplicated cart |
+| 4 | **Nutrition & Cost Card** | `NUTRITION_COST_CARD` | Per-recipe calorie, protein, and total cost breakdown scaled to servings |
+| 5 | **Dietary & Allergy Filters** | `DIETARY_FILTERS` | Applies all active dietary tags to Kimi prompts, catalog matching, and cart swap suggestions |
+| 6 | **Social Proof & Gamification** | `SOCIAL_PROOF_GAMIFICATION` | "X people nearby ordered this today" signals and streak badges for repeat AI-cooked recipes |
+| 7 | **Hands-Free Quick-Add** | `VOICE_QUICK_ADD` | Direct spoken commands ("add two litres of milk and a loaf of bread") parsed and matched instantly, with a confirmation step before anything hits the cart |
+| 8 | **Push Notifications & PWA Enhancements** | `PUSH_NOTIFICATIONS_PWA` | Creates a real browser Push subscription using `VITE_VAPID_PUBLIC_KEY`, then supports order-status, back-in-stock, and price-drop preferences |
+| 9 | **Predictive Reorder Feed** | `PREDICTIVE_REORDER_FEED` | A "you might need these" rail driven by purchase cadence — distinct from, and coexisting alongside, the Pramarsha surface |
+| 10 | **Referral & Cashback Wallet** | `REFERRAL_WALLET` | Full native-share referral flow, dual-sided crediting, wallet transaction history, and admin goodwill credits |
+
+Set the server flag as `FEATURE_<SUFFIX>` and the matching Vite build flag as `VITE_FEATURE_<SUFFIX>`. Push delivery additionally requires matching VAPID public/private keys; secrets belong in the deployment environment, never in Git.
 
 ---
 

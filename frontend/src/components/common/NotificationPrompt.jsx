@@ -1,16 +1,33 @@
 import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import Button from './Button';
+import { useAuth } from '../../hooks/useAuth';
+import { useUiStore } from '../../store/uiStore';
+import { featureFlags } from '../../utils/featureFlags';
+import { enablePushNotifications } from '../../services/notificationService';
 
 export default function NotificationPrompt() {
   const [show, setShow] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const { addToast } = useUiStore();
 
   useEffect(() => {
-    if (Notification.permission === 'default') {
+    if (featureFlags.pushNotificationsPwa && isAuthenticated && 'Notification' in window && Notification.permission === 'default') {
       const timer = setTimeout(() => setShow(true), 10000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [isAuthenticated]);
+
+  const enable = async () => {
+    try {
+      await enablePushNotifications();
+      addToast({ type: 'success', message: 'Push notifications enabled.' });
+    } catch (error) {
+      addToast({ type: 'error', message: error.message });
+    } finally {
+      setShow(false);
+    }
+  };
 
   if (!show) return null;
 
@@ -24,7 +41,7 @@ export default function NotificationPrompt() {
         <p className="text-xs text-gray-500 mt-1 mb-4 leading-relaxed">Get real-time updates on your order status and exclusive offers.</p>
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1 py-2 text-xs" onClick={() => setShow(false)}>Not Now</Button>
-          <Button className="flex-1 py-2 text-xs" onClick={() => { Notification.requestPermission(); setShow(false); }}>Enable</Button>
+          <Button className="flex-1 py-2 text-xs" onClick={enable}>Enable</Button>
         </div>
       </div>
     </div>

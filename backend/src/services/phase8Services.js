@@ -25,7 +25,7 @@ export async function fetchCatalogProducts({ dietaryTags = [] } = {}) {
   let dietaryClause = '';
   if (dietaryTags.length) {
     params.push(dietaryTags);
-    dietaryClause = `AND (p.dietary_tags IS NULL OR p.dietary_tags = '{}' OR p.dietary_tags && $${params.length}::text[])`;
+    dietaryClause = `AND p.dietary_tags @> $${params.length}::text[]`;
   }
 
   const { rows } = await pool.query(`
@@ -124,7 +124,11 @@ export async function buildWeeklyMealPlan({ userId, preferences, days = 7 }) {
   for (let day = 0; day < Math.min(7, Math.max(5, days)); day += 1) {
     const seed = DAY_SEEDS[day % DAY_SEEDS.length];
     const dish = seed[(day + (preferences?.cuisine_tags?.length || 0)) % seed.length];
-    const recipe = await generateRecipe(`${preferences?.veg_non_veg || ''} ${preferences?.cuisine_tags?.join(' ') || ''} ${dish}`.trim(), 2);
+    const recipe = await generateRecipe(
+      `${preferences?.veg_non_veg || ''} ${preferences?.cuisine_tags?.join(' ') || ''} ${dish}`.trim(),
+      2,
+      dietaryTags,
+    );
     recipes.push({ day: day + 1, dish_name: dish, ...recipe });
 
     for (const ingredient of recipe.ingredients || []) {
