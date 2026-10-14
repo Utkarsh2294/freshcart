@@ -148,7 +148,6 @@ async function fetchCatalogProducts() {
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.stock_qty > 0
     ORDER BY p.name ASC
   `);
   return rows;
@@ -191,27 +190,29 @@ async function addMatchedItemsHandler(req, res, next) {
     return res.status(400).json({ success: false, message: error.message });
   }
 
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const userId = req.user.id;
-    let cartResult = await pool.query("SELECT id FROM carts WHERE user_id = $1 AND status = 'active'", [userId]);
+    let cartResult = await client.query("SELECT id FROM carts WHERE user_id = $1 AND status = 'active' FOR UPDATE", [userId]);
     if (cartResult.rows.length === 0) {
-      cartResult = await pool.query("INSERT INTO carts (user_id, status) VALUES ($1, 'active') RETURNING id", [userId]);
+      cartResult = await client.query("INSERT INTO carts (user_id, status) VALUES ($1, 'active') RETURNING id", [userId]);
     }
     const cartId = cartResult.rows[0].id;
 
     for (const item of value.items) {
-      const existing = await pool.query(
+      const existing = await client.query(
         'SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2',
         [cartId, item.product_id]
       );
 
       if (existing.rows.length) {
-        await pool.query(
+        await client.query(
           'UPDATE cart_items SET qty = $1, source = $2 WHERE id = $3',
           [existing.rows[0].qty + item.quantity, 'ai_recipe', existing.rows[0].id]
         );
       } else {
-        await pool.query(
+        await client.query(
           'INSERT INTO cart_items (cart_id, product_id, qty, source) VALUES ($1, $2, $3, $4)',
           [cartId, item.product_id, item.quantity, 'ai_recipe']
         );
@@ -219,14 +220,14 @@ async function addMatchedItemsHandler(req, res, next) {
     }
 
     if (featureFlags.socialProofGamification) {
-      await pool.query(`
+      await client.query(`
         INSERT INTO ai_recipe_activity (user_id, activity_date, recipes_generated)
         VALUES ($1, CURRENT_DATE, 1)
         ON CONFLICT (user_id, activity_date)
         DO UPDATE SET recipes_generated = ai_recipe_activity.recipes_generated + 1
       `, [userId]);
 
-      await pool.query(`
+      await client.query(`
         INSERT INTO badges (user_id, badge_key, label)
         SELECT $1, 'ai_recipe_3_day', '3-day AI recipe streak'
         WHERE (
@@ -237,9 +238,13 @@ async function addMatchedItemsHandler(req, res, next) {
       `, [userId]);
     }
 
+    await client.query('COMMIT');
     return res.json({ success: true, added: value.items.length });
   } catch (err) {
+    await client.query('ROLLBACK');
     return next(err);
+  } finally {
+    client.release();
   }
 }
 

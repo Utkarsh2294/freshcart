@@ -103,40 +103,53 @@ function scoreProduct(ingredient, product) {
   return Math.min(1, hits / ingredientTokens.length + exactNameBonus + ingredientBonus);
 }
 
-function selectPack(ingredient, product) {
+export function selectPack(ingredient, candidateProducts) {
   const needed = normalizeQuantity(ingredient.qty, ingredient.unit);
-  const pack = parsePack(product.unit);
+  const candidates = candidateProducts
+    .map(product => ({ product, pack: parsePack(product.unit) }))
+    .filter(candidate => candidate.pack && needed && candidate.pack.unit === needed.unit);
 
-  if (!needed || !pack || needed.unit !== pack.unit) {
+  if (!needed || !candidates.length) {
     return {
+      product: candidateProducts[0],
       quantity: 1,
       match_type: 'closest',
       note: `Closest catalog match; recipe needs ${ingredient.qty}${ingredient.unit ? ` ${ingredient.unit}` : ''}.`,
     };
   }
 
-  const ratio = needed.value / pack.value;
-  if (Math.abs(ratio - Math.round(ratio)) < 0.001) {
-    const quantity = Math.max(1, Math.round(ratio));
+  const singlePacks = candidates
+    .filter(candidate => candidate.pack.value >= needed.value)
+    .sort((a, b) => a.pack.value - b.pack.value || Number(a.product.price) - Number(b.product.price));
+
+  if (singlePacks.length) {
+    const selected = singlePacks[0];
+    const ratio = selected.pack.value / needed.value;
+    const matchType = ratio <= 1.2 ? 'exact' : ratio > 2 ? 'oversized' : 'closest';
     return {
-      quantity,
-      match_type: quantity === 1 ? 'exact' : 'multi_pack',
-      note: quantity === 1 ? 'Exact pack covers the recipe quantity.' : `${quantity} packs cover the recipe quantity exactly.`,
+      product: selected.product,
+      quantity: 1,
+      match_type: matchType,
+      note: matchType === 'exact'
+        ? 'Smallest available pack closely matches the recipe quantity.'
+        : matchType === 'oversized'
+          ? 'Smallest available pack is more than twice the needed quantity.'
+          : 'Smallest available pack covers the recipe quantity.',
     };
   }
 
-  if (pack.value >= needed.value) {
-    return {
-      quantity: 1,
-      match_type: 'oversized',
-      note: `Smallest available pack covers ${Math.ceil((pack.value / needed.value) * 100)}% of the needed quantity.`,
-    };
-  }
+  const selected = candidates
+    .map(candidate => {
+      const quantity = Math.ceil(needed.value / candidate.pack.value);
+      return { ...candidate, quantity, excess: quantity * candidate.pack.value - needed.value };
+    })
+    .sort((a, b) => a.excess - b.excess || a.quantity - b.quantity || Number(a.product.price) - Number(b.product.price))[0];
 
   return {
-    quantity: Math.ceil(ratio),
+    product: selected.product,
+    quantity: selected.quantity,
     match_type: 'closest',
-    note: 'Multiple packs are needed to cover the recipe quantity.',
+    note: `${selected.quantity} x ${selected.product.unit} packs are the closest available quantity.`,
   };
 }
 
@@ -147,8 +160,7 @@ export function matchIngredientsToProducts(ingredients, products) {
       .filter(item => item.score > 0)
       .sort((a, b) => b.score - a.score || Number(a.product.price) - Number(b.product.price));
 
-    const best = ranked[0];
-    if (!best) {
+    if (!ranked.length) {
       return {
         ingredient,
         selected: false,
@@ -160,17 +172,47 @@ export function matchIngredientsToProducts(ingredients, products) {
       };
     }
 
-    const packSelection = selectPack(ingredient, best.product);
+    const available = ranked.filter(item => Number(item.product.stock_qty) > 0);
+    if (!available.length) {
+      return {
+        ingredient,
+        selected: false,
+        product: null,
+        quantity: 0,
+        match_type: 'out_of_stock',
+        note: 'Matching products exist but are out of stock nearby.',
+        confidence_score: Number(ranked[0].score.toFixed(2)),
+      };
+    }
+
+    const best = available[0];
+    if (best.score < 0.75) {
+      return {
+        ingredient,
+        selected: false,
+        product: best.product,
+        quantity: 1,
+        match_type: 'closest',
+        note: 'Not sure about this match - search manually before adding it.',
+        confidence_score: Number(best.score.toFixed(2)),
+        alternatives: available.slice(1, 4).map(item => ({ product: item.product, confidence_score: Number(item.score.toFixed(2)) })),
+      };
+    }
+
+    const packCandidates = available
+      .filter(item => item.score >= Math.max(0.75, best.score - 0.15))
+      .map(item => item.product);
+    const packSelection = selectPack(ingredient, packCandidates);
 
     return {
       ingredient,
       selected: true,
-      product: best.product,
+      product: packSelection.product,
       quantity: packSelection.quantity,
       match_type: packSelection.match_type,
       note: packSelection.note,
       confidence_score: Number(best.score.toFixed(2)),
-      alternatives: ranked.slice(1, 4).map(item => ({
+      alternatives: available.filter(item => item.product.id !== packSelection.product.id).slice(0, 3).map(item => ({
         product: item.product,
         confidence_score: Number(item.score.toFixed(2)),
       })),

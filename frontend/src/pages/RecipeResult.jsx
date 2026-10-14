@@ -16,6 +16,7 @@ const badgeStyles = {
   oversized: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
   closest: 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
   no_match: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+  out_of_stock: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
 };
 
 export default function RecipeResult() {
