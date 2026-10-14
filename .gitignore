@@ -18,6 +18,8 @@ coverage
 
 # Build artifacts
 *.tgz
+__pycache__/
+*.py[cod]
 
 # OS
 .DS_Store

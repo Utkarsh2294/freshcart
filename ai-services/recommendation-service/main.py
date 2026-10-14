@@ -1,119 +1,110 @@
-"""
-recommendation-service  (Phase 2)
+"""Self-hosted Phase 2 recommendation and review-scoring service."""
 
-Self-hosted user-affinity scorer. No third-party AI.
-Reads order history from Postgres, computes per-product
-affinity scores using purchase frequency + recency weighting,
-and writes them back to the product_scores table.
-
-Endpoints
----------
-POST /score          {user_id: int}  -> {scored: int}
-GET  /top            ?user_id=&limit=  -> {product_ids: list[int]}
-GET  /health         -> {status: "ok"}
-"""
-
-import os, math, psycopg2, psycopg2.extras
+import os
 from contextlib import contextmanager
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+
+import psycopg
+from psycopg.rows import dict_row
 from dotenv import load_dotenv
+from fastapi import FastAPI, Query
+from pydantic import BaseModel, Field
+
+from models.scoring import affinity_score, sentiment_score
 
 load_dotenv()
 
-app = FastAPI(title="Freshcart Recommendation Service", version="2.0.0")
-
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freshcart:freshcart_pass@localhost:5433/freshcart")
+app = FastAPI(title="Freshcart Recommendation Service", version="4.0.0")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://freshcart:freshcart_pass@localhost:5433/freshcart",
+)
 
 
 @contextmanager
 def get_conn():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg.connect(DATABASE_URL)
     try:
         yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
     finally:
         conn.close()
 
 
-def recency_weight(days_ago: float) -> float:
-    """Exponential decay: full weight at 0 days, ~37% at 30 days."""
-    return math.exp(-days_ago / 30.0)
-
-
 class ScoreRequest(BaseModel):
-    user_id: int
+    user_id: int = Field(gt=0)
 
 
-@app.post("/score")
-def score_user(body: ScoreRequest):
-    """
-    Compute affinity scores for all products a user has ever ordered,
-    then upsert into product_scores. Products not in order history keep
-    their existing score (or the default 0.5 from the migration).
-    """
+class ReviewRequest(BaseModel):
+    review_text: str = Field(min_length=1, max_length=5000)
+    rating: int | None = Field(default=None, ge=1, le=5)
+
+
+def affinity_rows(user_id: int, limit: int):
     with get_conn() as conn:
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-        # Fetch purchase history with recency
-        cur.execute("""
-            SELECT
-                oi.product_id,
-                COUNT(*)::float                           AS freq,
-                EXTRACT(EPOCH FROM (NOW() - MAX(o.created_at)))/86400.0 AS days_ago
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            """
+            SELECT oi.product_id,
+                   COUNT(*)::float AS frequency,
+                   EXTRACT(EPOCH FROM (NOW() - MAX(o.created_at))) / 86400.0 AS days_ago
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
             WHERE o.user_id = %s
             GROUP BY oi.product_id
-        """, (body.user_id,))
+            """,
+            (user_id,),
+        )
         rows = cur.fetchall()
 
-        if not rows:
-            return {"scored": 0}
+    max_frequency = max((row["frequency"] for row in rows), default=1.0)
+    scored = [
+        {
+            "product_id": row["product_id"],
+            "score": affinity_score(row["frequency"], max_frequency, row["days_ago"]),
+        }
+        for row in rows
+    ]
+    return sorted(scored, key=lambda item: item["score"], reverse=True)[:limit]
 
-        max_freq = max(r["freq"] for r in rows) or 1.0
-        scored = 0
 
-        for row in rows:
-            norm_freq = row["freq"] / max_freq          # 0..1
-            recency   = recency_weight(row["days_ago"])  # 0..1
-            score     = round(0.6 * norm_freq + 0.4 * recency, 4)
-            score     = min(1.0, max(0.0, score))
+@app.post("/score-review")
+def score_review(body: ReviewRequest):
+    return {"sentiment_score": sentiment_score(body.review_text, body.rating)}
 
-            cur.execute("""
-                INSERT INTO product_scores (product_id, final_score, updated_at)
-                VALUES (%s, %s, NOW())
-                ON CONFLICT (product_id)
-                DO UPDATE SET final_score = EXCLUDED.final_score, updated_at = NOW()
-            """, (row["product_id"], score))
-            scored += 1
 
-    return {"scored": scored}
+@app.get("/best-in-category")
+def best_in_category(category_id: int = Query(..., gt=0), limit: int = Query(4, ge=1, le=50)):
+    with get_conn() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            """
+            SELECT p.id AS product_id, p.name, p.price::float, p.unit, p.image_url,
+                   b.name AS brand, COALESCE(ps.final_score, 0.55)::float AS final_score
+            FROM products p
+            LEFT JOIN brands b ON b.id = p.brand_id
+            LEFT JOIN product_scores ps ON ps.product_id = p.id
+            WHERE p.category_id = %s AND p.stock_qty > 0
+            ORDER BY COALESCE(ps.final_score, 0.55) DESC, p.stock_qty DESC, p.name
+            LIMIT %s
+            """,
+            (category_id, limit),
+        )
+        return {"products": cur.fetchall()}
+
+
+@app.get("/user-affinity")
+def user_affinity(user_id: int = Query(..., gt=0), limit: int = Query(10, ge=1, le=50)):
+    return {"products": affinity_rows(user_id, limit)}
+
+
+# Backward-compatible aliases used by the existing Node client.
+@app.post("/score")
+def score_user(body: ScoreRequest):
+    return {"scored": len(affinity_rows(body.user_id, 50))}
 
 
 @app.get("/top")
-def top_products(user_id: int = Query(...), limit: int = Query(10, ge=1, le=50)):
-    """
-    Return the top-scoring product IDs for a user, ordered by affinity score.
-    Only returns products the user has actually purchased (from product_scores).
-    """
-    with get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT ps.product_id
-            FROM product_scores ps
-            JOIN order_items oi ON oi.product_id = ps.product_id
-            JOIN orders o ON o.id = oi.order_id
-            WHERE o.user_id = %s AND ps.final_score > 0
-            GROUP BY ps.product_id, ps.final_score
-            ORDER BY ps.final_score DESC
-            LIMIT %s
-        """, (user_id, limit))
-        ids = [row[0] for row in cur.fetchall()]
-    return {"product_ids": ids}
+def top_products(user_id: int = Query(..., gt=0), limit: int = Query(10, ge=1, le=50)):
+    return {"product_ids": [item["product_id"] for item in affinity_rows(user_id, limit)]}
 
 
 @app.get("/health")
