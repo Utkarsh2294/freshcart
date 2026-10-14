@@ -1,3 +1,7 @@
 # Docker ignore rules
 node_modules
 .env
+.git
+**/dist
+**/__pycache__
+tmp

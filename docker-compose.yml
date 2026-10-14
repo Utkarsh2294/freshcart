@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: freshcart_pass
       POSTGRES_DB: freshcart
     ports:
-      - '5433:5432'
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U freshcart']
+      test: ["CMD-SHELL", "pg_isready -U freshcart"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,11 +20,11 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -35,7 +35,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     ports:
-      - '4000:4000'
+      - "4000:4000"
     environment:
       NODE_ENV: development
       PORT: 4000
@@ -58,14 +58,17 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      target: build
     restart: unless-stopped
     ports:
-      - '5173:5173'
+      - "5173:5173"
     environment:
       VITE_API_URL: http://localhost:4000/api
       VITE_SOCKET_URL: http://localhost:4000
     volumes:
       - ./frontend/src:/app/frontend/src
+    command:
+      ["npm", "run", "dev", "--workspace=frontend", "--", "--host", "0.0.0.0"]
 
   # Phase 2 — Recommendation Engine (self-hosted, no third-party AI)
   recommendation-service:
@@ -74,7 +77,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - '8001:8001'
+      - "8001:8001"
     environment:
       DATABASE_URL: postgresql://freshcart:freshcart_pass@postgres:5432/freshcart
     depends_on:
@@ -88,9 +91,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - '8002:8002'
+      - "8002:8002"
 
 volumes:
   pgdata:
   redisdata:
-

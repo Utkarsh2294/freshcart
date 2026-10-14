@@ -1,30 +1,26 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: freshcart-db-prod
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-freshcart}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-freshcart}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-freshcart}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-freshcart}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: freshcart-redis-prod
     restart: always
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,35 +29,122 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: freshcart-api-prod
     restart: always
     ports:
-      - '${PORT:-4000}:4000'
+      - "${PORT:-4000}:4000"
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-freshcart}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-freshcart}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-freshcart}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-freshcart}
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      KIMI_MODEL: ${KIMI_MODEL:-moonshotai/kimi-k3}
+      KIMI_BASE_URL: ${KIMI_BASE_URL:-https://openrouter.ai/api/v1}
+      KIMI_TIMEOUT_MS: ${KIMI_TIMEOUT_MS:-12000}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@freshcart.local}
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8001
+      INPUT_UNDERSTANDING_SERVICE_URL: http://input-understanding-service:8002
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: freshcart-web-prod
+      args:
+        VITE_API_URL: /api
+        VITE_SOCKET_URL: ""
+        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
     restart: always
     ports:
-      - '80:5173'
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  recommendation-service:
+    build:
+      context: ./ai-services/recommendation-service
+      dockerfile: Dockerfile
+    restart: always
     environment:
-      VITE_API_URL: ${VITE_API_URL:-/api}
-      VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-freshcart}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-freshcart}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  input-understanding-service:
+    build:
+      context: ./ai-services/input-understanding-service
+      dockerfile: Dockerfile
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    restart: always
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-now}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   pgdata:
   redisdata:
+  grafanadata:

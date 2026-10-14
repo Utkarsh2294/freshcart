@@ -12,17 +12,21 @@
  *   - Auth is handled by upstream middleware (see routes/cookThisRoutes.js)
  */
 
-import Joi from 'joi';
-import { generateRecipe, RecipeGenerationError } from '../services/kimiRecipeClient.js';
-import { pool } from '../config/database.js';
-import { matchIngredientsToProducts } from '../services/ingredientMatcherService.js';
-import { featureFlags } from '../config/featureFlags.js';
+import Joi from "joi";
+import {
+  generateRecipe,
+  getKimiMetrics,
+  RecipeGenerationError,
+} from "../services/kimiRecipeClient.js";
+import { pool } from "../config/database.js";
+import { matchIngredientsToProducts } from "../services/ingredientMatcherService.js";
+import { featureFlags } from "../config/featureFlags.js";
 import {
   computeNutritionAndCost,
   fetchCatalogProducts as fetchPhase8CatalogProducts,
   filterMatchesWithPantry,
   getUserDietaryTags,
-} from '../services/phase8Services.js';
+} from "../services/phase8Services.js";
 
 const requestSchema = Joi.object({
   dish_name: Joi.string().trim().min(1).max(200).required(),
@@ -30,25 +34,41 @@ const requestSchema = Joi.object({
 }).required();
 
 const matchRequestSchema = Joi.object({
-  ingredients: Joi.array().items(Joi.object({
-    name: Joi.string().trim().min(1).required(),
-    qty: Joi.number().positive().required(),
-    unit: Joi.string().allow('', null).default(null),
-    notes: Joi.string().allow('', null).default(null),
-  })).min(1).required(),
+  ingredients: Joi.array()
+    .items(
+      Joi.object({
+        name: Joi.string().trim().min(1).required(),
+        qty: Joi.number().positive().required(),
+        unit: Joi.string().allow("", null).default(null),
+        notes: Joi.string().allow("", null).default(null),
+      }),
+    )
+    .min(1)
+    .required(),
   servings: Joi.number().integer().min(1).max(50).optional(),
 }).required();
 
 const addMatchedItemsSchema = Joi.object({
-  items: Joi.array().items(Joi.object({
-    product_id: Joi.number().integer().positive().required(),
-    quantity: Joi.number().integer().min(1).max(50).required(),
-  })).min(1).required(),
+  items: Joi.array()
+    .items(
+      Joi.object({
+        product_id: Joi.number().integer().positive().required(),
+        quantity: Joi.number().integer().min(1).max(50).required(),
+      }),
+    )
+    .min(1)
+    .required(),
 }).required();
+
+const cacheMetrics = {
+  hits: 0,
+  misses: 0,
+  low_hit_rate_warning_emitted: false,
+};
 
 /** Trim, lowercase, collapse internal whitespace — the cache key shape. */
 function normalizeDishName(name) {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 async function findCachedRecipe(dishName, servings) {
@@ -57,7 +77,7 @@ async function findCachedRecipe(dishName, servings) {
        FROM recipe_cache
       WHERE dish_name = $1 AND servings = $2
       LIMIT 1`,
-    [dishName, servings]
+    [dishName, servings],
   );
   return rows[0] || null;
 }
@@ -77,7 +97,7 @@ async function cacheRecipe(dishName, servings, recipe) {
       recipe.title,
       JSON.stringify(recipe.steps),
       JSON.stringify(recipe.ingredients),
-    ]
+    ],
   );
 }
 
@@ -91,21 +111,41 @@ async function generateRecipeHandler(req, res) {
   const dishName = normalizeDishName(rawDishName);
 
   try {
-    const dietaryTags = featureFlags.dietaryFilters && req.user?.id
-      ? await getUserDietaryTags(req.user.id)
-      : [];
+    const dietaryTags =
+      featureFlags.dietaryFilters && req.user?.id
+        ? await getUserDietaryTags(req.user.id)
+        : [];
     const cacheKey = dietaryTags.length
-      ? `${dishName} | dietary:${[...dietaryTags].sort().join(',')}`
+      ? `${dishName} | dietary:${[...dietaryTags].sort().join(",")}`
       : dishName;
     const cached = await findCachedRecipe(cacheKey, servings);
     if (cached) {
+      cacheMetrics.hits += 1;
       return res.status(200).json({
         title: cached.title,
         steps: cached.steps,
         ingredients: cached.ingredients,
         nutrition: cached.nutrition || null,
-        source: 'cache',
+        source: "cache",
       });
+    }
+
+    cacheMetrics.misses += 1;
+    const cacheRequests = cacheMetrics.hits + cacheMetrics.misses;
+    const hitRate = cacheMetrics.hits / cacheRequests;
+    if (
+      cacheRequests >= 10 &&
+      hitRate < 0.25 &&
+      !cacheMetrics.low_hit_rate_warning_emitted
+    ) {
+      cacheMetrics.low_hit_rate_warning_emitted = true;
+      console.warn(
+        JSON.stringify({
+          event: "recipe_cache_low_hit_rate",
+          hit_rate: hitRate,
+          requests: cacheRequests,
+        }),
+      );
     }
 
     const recipe = await generateRecipe(dishName, servings, dietaryTags);
@@ -115,27 +155,50 @@ async function generateRecipeHandler(req, res) {
       title: recipe.title,
       steps: recipe.steps,
       ingredients: recipe.ingredients,
-      source: 'kimi_api',
+      source: "kimi_api",
     });
   } catch (err) {
     if (err instanceof RecipeGenerationError) {
-      console.error('[POST /ai/cook-this/generate] Graceful failure cause:', err.cause || err.message);
+      console.error(
+        "[POST /ai/cook-this/generate] Graceful failure cause:",
+        err.cause || err.message,
+      );
       // Graceful failure state — never a silent crash, never an empty cart.
       return res.status(422).json({
         success: false,
-        error: 'recipe_generation_failed',
-        message: "Couldn't generate that recipe — try rephrasing the dish name.",
+        error: "recipe_generation_failed",
+        message:
+          "Couldn't generate that recipe — try rephrasing the dish name.",
       });
     }
 
     // Anything else (DB unreachable, etc.) - still respond cleanly.
-    console.error('[POST /ai/cook-this/generate] unexpected error:', err);
+    console.error("[POST /ai/cook-this/generate] unexpected error:", err);
     return res.status(500).json({
       success: false,
-      error: 'internal_error',
+      error: "internal_error",
       message: "Couldn't generate that recipe — try again in a moment.",
     });
   }
+}
+
+function getCookThisMetrics() {
+  const requests = cacheMetrics.hits + cacheMetrics.misses;
+  return {
+    kimi: getKimiMetrics(),
+    recipe_cache: {
+      hits: cacheMetrics.hits,
+      misses: cacheMetrics.misses,
+      hit_rate: requests
+        ? Number((cacheMetrics.hits / requests).toFixed(4))
+        : 0,
+      alert_below: 0.25,
+    },
+  };
+}
+
+function getCookThisMetricsHandler(req, res) {
+  res.json(getCookThisMetrics());
 }
 
 async function fetchCatalogProducts() {
@@ -166,18 +229,24 @@ async function matchIngredientsHandler(req, res, next) {
   }
 
   try {
-    const dietaryTags = featureFlags.dietaryFilters && req.user?.id
-      ? await getUserDietaryTags(req.user.id)
-      : [];
+    const dietaryTags =
+      featureFlags.dietaryFilters && req.user?.id
+        ? await getUserDietaryTags(req.user.id)
+        : [];
     const products = dietaryTags.length
       ? await fetchPhase8CatalogProducts({ dietaryTags })
       : await fetchCatalogProducts();
     const matches = matchIngredientsToProducts(value.ingredients, products);
-    const pantryResult = featureFlags.smartPantry && req.user?.id
-      ? await filterMatchesWithPantry(req.user.id, matches)
-      : { matches, pantry_note: '', skipped: [] };
+    const pantryResult =
+      featureFlags.smartPantry && req.user?.id
+        ? await filterMatchesWithPantry(req.user.id, matches)
+        : { matches, pantry_note: "", skipped: [] };
     const nutrition = featureFlags.nutritionCostCard
-      ? await computeNutritionAndCost(value.ingredients, pantryResult.matches, Number(value.servings || 1))
+      ? await computeNutritionAndCost(
+          value.ingredients,
+          pantryResult.matches,
+          Number(value.servings || 1),
+        )
       : null;
 
     return res.json({
@@ -198,42 +267,56 @@ async function addMatchedItemsHandler(req, res, next) {
 
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const userId = req.user.id;
-    let cartResult = await client.query("SELECT id FROM carts WHERE user_id = $1 AND status = 'active' FOR UPDATE", [userId]);
+    let cartResult = await client.query(
+      "SELECT id FROM carts WHERE user_id = $1 AND status = 'active' FOR UPDATE",
+      [userId],
+    );
     if (cartResult.rows.length === 0) {
-      cartResult = await client.query("INSERT INTO carts (user_id, status) VALUES ($1, 'active') RETURNING id", [userId]);
+      cartResult = await client.query(
+        "INSERT INTO carts (user_id, status) VALUES ($1, 'active') RETURNING id",
+        [userId],
+      );
     }
     const cartId = cartResult.rows[0].id;
 
     for (const item of value.items) {
       const existing = await client.query(
-        'SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2',
-        [cartId, item.product_id]
+        "SELECT id, qty FROM cart_items WHERE cart_id = $1 AND product_id = $2",
+        [cartId, item.product_id],
       );
 
       if (existing.rows.length) {
         await client.query(
-          'UPDATE cart_items SET qty = $1, source = $2 WHERE id = $3',
-          [existing.rows[0].qty + item.quantity, 'ai_recipe', existing.rows[0].id]
+          "UPDATE cart_items SET qty = $1, source = $2 WHERE id = $3",
+          [
+            existing.rows[0].qty + item.quantity,
+            "ai_recipe",
+            existing.rows[0].id,
+          ],
         );
       } else {
         await client.query(
-          'INSERT INTO cart_items (cart_id, product_id, qty, source) VALUES ($1, $2, $3, $4)',
-          [cartId, item.product_id, item.quantity, 'ai_recipe']
+          "INSERT INTO cart_items (cart_id, product_id, qty, source) VALUES ($1, $2, $3, $4)",
+          [cartId, item.product_id, item.quantity, "ai_recipe"],
         );
       }
     }
 
     if (featureFlags.socialProofGamification) {
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO ai_recipe_activity (user_id, activity_date, recipes_generated)
         VALUES ($1, CURRENT_DATE, 1)
         ON CONFLICT (user_id, activity_date)
         DO UPDATE SET recipes_generated = ai_recipe_activity.recipes_generated + 1
-      `, [userId]);
+      `,
+        [userId],
+      );
 
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO badges (user_id, badge_key, label)
         SELECT $1, 'ai_recipe_3_day', '3-day AI recipe streak'
         WHERE (
@@ -241,17 +324,26 @@ async function addMatchedItemsHandler(req, res, next) {
           WHERE user_id = $1 AND activity_date >= CURRENT_DATE - INTERVAL '2 days'
         ) >= 3
         ON CONFLICT DO NOTHING
-      `, [userId]);
+      `,
+        [userId],
+      );
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return res.json({ success: true, added: value.items.length });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     return next(err);
   } finally {
     client.release();
   }
 }
 
-export { addMatchedItemsHandler, generateRecipeHandler, matchIngredientsHandler, normalizeDishName };
+export {
+  addMatchedItemsHandler,
+  generateRecipeHandler,
+  getCookThisMetrics,
+  getCookThisMetricsHandler,
+  matchIngredientsHandler,
+  normalizeDishName,
+};

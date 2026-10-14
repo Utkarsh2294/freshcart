@@ -17,10 +17,19 @@
     "build": "npm run build --workspace=frontend",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "format:check": "node scripts/checkChangedFormatting.js",
+    "check:contracts": "node scripts/checkContracts.js",
+    "check:pwa": "node scripts/checkPwaBuild.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "jobs:pramarsha": "node scripts/jobs/computeCadenceAndStreaks.js",
     "check:phase7": "node scripts/checkPhase7Data.js",
     "check:catalog": "node scripts/checkCatalogParity.js"
+  },
+  "dependencies": {
+    "engine.io": "^6.6.11"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
   }
 }

@@ -44,12 +44,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -74,3 +76,32 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Contract conformance
+        run: npm run check:contracts
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build PWA
+        run: npm run build
+
+      - name: Verify PWA cache busting
+        run: npm run check:pwa
+
+      - name: Check formatting of changed files
+        env:
+          FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run format:check
+
+      - name: Validate production Compose
+        env:
+          POSTGRES_PASSWORD: ci-compose-password
+          JWT_SECRET: ci-compose-jwt-secret
+          JWT_REFRESH_SECRET: ci-compose-refresh-secret
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+      - name: Test Python services
+        run: |
+          python ai-services/input-understanding-service/test_nlu.py
+          python ai-services/recommendation-service/test_scoring.py
