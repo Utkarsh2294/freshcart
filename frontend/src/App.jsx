@@ -13,11 +13,7 @@ export default function App() {
   useSocket();
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.body.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
 
   return (

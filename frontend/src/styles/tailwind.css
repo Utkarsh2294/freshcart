@@ -8,7 +8,7 @@
     color-scheme: light;
   }
 
-  html.dark {
+  body.dark {
     color-scheme: dark;
   }
 

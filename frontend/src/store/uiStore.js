@@ -1,7 +1,14 @@
 import { create } from 'zustand';
+import { resolveInitialDarkMode } from '../utils/theme.js';
+
+const storedTheme = localStorage.getItem('theme');
+const initialDarkMode = resolveInitialDarkMode(
+  storedTheme,
+  window.matchMedia('(prefers-color-scheme: dark)').matches,
+);
 
 export const useUiStore = create((set) => ({
-  isDarkMode: localStorage.getItem('theme') === 'dark',
+  isDarkMode: initialDarkMode,
   sidebarOpen: false,
   toasts: [],
 
@@ -9,9 +16,9 @@ export const useUiStore = create((set) => ({
     const newTheme = !state.isDarkMode;
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
     if (newTheme) {
-      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
     }
     return { isDarkMode: newTheme };
   }),
