@@ -7,7 +7,7 @@
  * always run; integration tests are skipped rather than failed).
  */
 
-import pg from 'pg';
+import pg from "pg";
 
 const { Client } = pg;
 
@@ -15,11 +15,13 @@ let dbAvailable = false;
 
 try {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL || 'postgresql://freshcart:freshcart_pass@localhost:5433/freshcart',
+    connectionString:
+      process.env.DATABASE_URL ||
+      "postgresql://freshcart:freshcart_pass@localhost:5433/freshcart",
     connectionTimeoutMillis: 2000,
   });
   await client.connect();
-  await client.query('SELECT 1');
+  await client.query("SELECT 1");
   await client.end();
   dbAvailable = true;
 } catch {
@@ -30,5 +32,7 @@ try {
 globalThis.__FRESHCART_DB_AVAILABLE__ = dbAvailable;
 
 if (!dbAvailable) {
-  console.log('[vitest-setup] Postgres not reachable — integration tests will be skipped (unit tests still run).');
+  console.log(
+    "[vitest-setup] Postgres not reachable — integration tests will be skipped (unit tests still run).",
+  );
 }
