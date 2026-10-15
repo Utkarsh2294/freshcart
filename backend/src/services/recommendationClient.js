@@ -6,9 +6,13 @@
  * Falls back gracefully if the service is unreachable — homeController uses the
  * local temporal fallback in that case (same pattern as Pramarsha).
  */
-import { URL } from 'url';
+import { URL } from "url";
 
-const RECOMMENDATION_SERVICE_URL = process.env.RECOMMENDATION_SERVICE_URL || 'http://localhost:8001';
+const rawServiceUrl =
+  process.env.RECOMMENDATION_SERVICE_URL || "http://localhost:8001";
+const RECOMMENDATION_SERVICE_URL = rawServiceUrl.includes("://")
+  ? rawServiceUrl
+  : `http://${rawServiceUrl}`;
 const TIMEOUT_MS = 500;
 
 /**
@@ -23,8 +27,8 @@ export async function scoreUserAffinity(userId) {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(`${RECOMMENDATION_SERVICE_URL}/score`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
       signal: controller.signal,
     });
@@ -48,9 +52,9 @@ export async function getTopProductIds(userId, limit = 10) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const url = new URL('/top', RECOMMENDATION_SERVICE_URL);
-    url.searchParams.set('user_id', userId);
-    url.searchParams.set('limit', limit);
+    const url = new URL("/top", RECOMMENDATION_SERVICE_URL);
+    url.searchParams.set("user_id", userId);
+    url.searchParams.set("limit", limit);
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return [];
     const data = await res.json();

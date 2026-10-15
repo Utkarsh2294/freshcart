@@ -213,27 +213,15 @@ Set the server flag as `FEATURE_<SUFFIX>` and the matching Vite build flag as `V
                      ┌──────────────────┼──────────────────┐
                      ▼                  ▼                  ▼
         ┌────────────────────┐ ┌────────────────┐ ┌────────────────────┐
-        │  Intelligence       │ │  PostgreSQL 16   │ │  Redis (cache +    │
-        │  Orchestrator       │ │  (system of      │ │  queues) + MinIO   │
-        │  → intent parsing    │ │   record)        │ │  (object storage)  │
-        │  → recipe generation │ └────────────────┘ └────────────────────┘
-        │  → ingredient        │
-        │    grounding         │
-        │  → recommendation &  │
-        │    trust scoring     │
-        └──────────┬──────────┘
-                    │
-                    ▼
-        ┌────────────────────────────┐
-        │  Pramarsha (external,       │
-        │  independently owned)       │
-        │  — consumed, never modified │
-        └────────────────────────────┘
+        │ Input understanding │ │ PostgreSQL 16  │ │ Recommendation     │
+        │ (self-hosted rules)  │ │ (system of    │ │ service            │
+        └────────────────────┘ │ record)         │ └────────────────────┘
+                               └────────────────┘
 ```
 
 **Design principles carried through every layer:**
 
-- The API layer never talks to an intelligence service directly — every call routes through a single internal orchestrator, so any individual service can degrade or go offline without taking down browsing or checkout.
+- Intelligence calls have bounded timeouts and deterministic fallbacks, so an unavailable helper service does not take down browsing or checkout.
 - Every service boundary is documented as an explicit, versioned contract, kept in a dedicated `/contracts` folder and treated as load-bearing documentation, not an afterthought.
 - The Pramarsha personalization engine is treated as an external system with its own data and its own logic — Freshcart consumes its output through one clean endpoint and never reaches into its internals.
 
@@ -246,12 +234,10 @@ Set the server flag as `FEATURE_<SUFFIX>` and the matching Vite build flag as `V
 | **Frontend**              | React 18, Vite, Tailwind CSS (built directly against the locked design-token file), Zustand / Redux Toolkit, PropTypes                        |
 | **Backend API**           | Node.js, Express (ESM), Socket.IO for live tracking and notifications                                                                         |
 | **Primary Database**      | PostgreSQL 16 with trigram search indexing                                                                                                    |
-| **Cache & Queues**        | Redis, background job queues for scoring, caching, and notification delivery                                                                  |
-| **Object Storage**        | MinIO (S3-compatible, self-hosted)                                                                                                            |
 | **Intelligence Services** | A dedicated microservice layer handling intent understanding, ingredient grounding, recipe generation, and trust-based recommendation scoring |
 | **Voice Input**           | Native browser speech recognition — no server round-trip                                                                                      |
 | **Maps & Live Tracking**  | Self-hosted map tiles with real-time rider position interpolation                                                                             |
-| **Auth**                  | JWT with refresh tokens, OTP-based login                                                                                                      |
+| **Access**                | Automatic anonymous customer sessions; JWT-protected admin routes                                                                             |
 | **Payments**              | Test-mode card/UPI processing, internal wallet ledger, mock buy-now-pay-later                                                                 |
 | **PWA & Push**            | Installable manifest and service worker from the first release, standards-based web push                                                      |
 | **DevOps**                | Docker Compose for local development, containerized production deployment, CI with mandatory lint and test gates                              |
@@ -365,13 +351,12 @@ freshcart/
 │   │   │   └── layout/              # AppShell, Header, Footer, Sidebar, MobileNav
 │   │   ├── design-tokens/           # Locked token modules — colors, typography,
 │   │   │                            #   spacing, radii, elevation, tokens.json
-│   │   ├── hooks/                   # Custom hooks — useAuth, useCart, useSearch,
+│   │   ├── hooks/                   # Custom hooks — useAuth, useSearch,
 │   │   │                            #   useSocket, usePWA, …
 │   │   ├── pages/
 │   │   │   ├── admin/               # Dashboard, ProductManagement, OrderManagement,
 │   │   │   │                        #   DarkStoreManagement, WalletCredit
 │   │   │   ├── Home.jsx
-│   │   │   ├── Auth.jsx
 │   │   │   ├── Cart.jsx
 │   │   │   ├── Checkout.jsx
 │   │   │   ├── CookThis.jsx
@@ -382,13 +367,13 @@ freshcart/
 │   │   │   ├── OrderTracking.jsx
 │   │   │   ├── WalletPayments.jsx
 │   │   │   └── NotificationPreferences.jsx
-│   │   ├── router/                  # Route definitions, ProtectedRoute, AdminRoute
+│   │   ├── router/                  # Route definitions and the admin-only guard
 │   │   ├── services/                # API client layer — auth, cart, cook, home,
 │   │   │                            #   order, product, search, wallet, socket, …
 │   │   ├── store/                   # Zustand stores — auth, cart, order, product,
 │   │   │                            #   wallet, ui
 │   │   ├── styles/                  # Global CSS — variables, animations, global, tailwind
-│   │   ├── utils/                   # Constants, feature flags, formatters, validators,
+│   │   ├── utils/                   # Constants, feature flags, formatters,
 │   │   │                            #   product image map
 │   │   ├── App.jsx
 │   │   └── main.jsx
@@ -400,19 +385,18 @@ freshcart/
 │
 ├── backend/                         # Node.js / Express API (ESM)
 │   ├── src/
-│   │   ├── config/                  # DB, Redis, feature-flag configuration
+│   │   ├── config/                  # Database and runtime configuration
 │   │   ├── controllers/             # Route handlers — auth, cart, cookThis, home,
 │   │   │                            #   order, product, search, admin, referral, …
 │   │   ├── data/                    # Static data files (festival calendar, etc.)
-│   │   ├── db/                      # Connection pool & migration runner
 │   │   ├── jobs/                    # Background workers (rider simulator)
 │   │   ├── middleware/              # Auth, admin guard, validation, rate limiter,
 │   │   │                            #   error handler
 │   │   ├── routes/                  # Express route modules — auth, cart, cookThis,
 │   │   │                            #   home, order, product, search, tracking,
 │   │   │                            #   admin, referral, review, wallet, notification, …
-│   │   ├── services/                # Intelligence orchestrator clients — recipe,
-│   │   │                            #   ingredient matcher, recommendation, quick-add parser
+│   │   ├── services/                # Recipe, ingredient matching, recommendation,
+│   │   │                            #   and quick-add services
 │   │   ├── app.js                   # Express app factory
 │   │   └── server.js                # Server entry point + Socket.IO bootstrap
 │   ├── tests/
@@ -471,8 +455,9 @@ freshcart/
 │   └── workflows/
 │       └── ci.yml                   # CI pipeline — lint & test gates
 │
-├── docker-compose.yml               # Local dev stack (DB, Redis, API, frontend, active AI services)
+├── docker-compose.yml               # Local dev stack (DB, API, frontend, active AI services)
 ├── docker-compose.prod.yml          # Production deployment compose
+├── render.yaml                      # Render Blueprint (web app, AI services, Postgres)
 ├── .env.example                     # Environment variable template
 ├── .dockerignore
 ├── .gitignore
@@ -489,7 +474,7 @@ The storefront will be available locally with hot reload on both the frontend an
 - Groq with `openai/gpt-oss-120b` powers recipe generation and is the only third-party AI call. It is cache-first, rate-limited, timed out, retried once, and circuit-broken.
 - Ingredient matching, pack selection, recommendation scoring, and intent parsing remain deterministic or self-hosted.
 - Pramarsha is consumed through its recommendation boundary; its schema and mining implementation are not modified.
-- The production frontend is a static, cache-busted Nginx PWA rather than a Vite development server.
+- In production, Express serves the static, cache-busted PWA and API from one public origin.
 - Phase 8 modules are independently flagged. VAPID and Groq secrets are injected at deployment time and are never committed.
 
 See [the deployment runbook](docs/deployment-runbook.md) and [load-test report](docs/load-test-report.md) for production verification.

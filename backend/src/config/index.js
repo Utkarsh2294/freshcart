@@ -10,7 +10,6 @@ export const config = {
   DATABASE_URL:
     process.env.DATABASE_URL ||
     "postgresql://freshcart:freshcart_pass@localhost:5433/freshcart",
-  REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
   JWT_SECRET: process.env.JWT_SECRET || "fallback-secret",
   JWT_REFRESH_SECRET:
     process.env.JWT_REFRESH_SECRET || "fallback-refresh-secret",
@@ -22,11 +21,14 @@ export const config = {
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
   VAPID_SUBJECT: process.env.VAPID_SUBJECT || "mailto:support@freshcart.local",
   NODE_ENV: process.env.NODE_ENV || "development",
-  CORS_ORIGINS: (
-    process.env.CORS_ORIGINS ||
-    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175"
-  )
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  CORS_ORIGINS:
+    process.env.CORS_ORIGINS === "*"
+      ? "*"
+      : (
+          process.env.CORS_ORIGINS ||
+          "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175"
+        )
+          .split(",")
+          .map((origin) => origin.trim())
+          .filter(Boolean),
 };

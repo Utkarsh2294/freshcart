@@ -16,19 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: .
@@ -40,7 +27,6 @@ services:
       NODE_ENV: development
       PORT: 4000
       DATABASE_URL: postgresql://freshcart:freshcart_pass@postgres:5432/freshcart
-      REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-jwt-secret-change-me
       JWT_REFRESH_SECRET: dev-refresh-secret-change-me
       JWT_EXPIRES_IN: 15m
@@ -51,8 +37,6 @@ services:
       GROQ_TIMEOUT_MS: ${GROQ_TIMEOUT_MS:-12000}
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/backend/src
@@ -99,4 +83,3 @@ services:
 
 volumes:
   pgdata:
-  redisdata:

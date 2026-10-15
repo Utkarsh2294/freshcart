@@ -1,21 +1,23 @@
-import { pool } from '../config/database.js';
-import jwt from 'jsonwebtoken';
-import { config } from '../config/index.js';
+import { pool } from "../config/database.js";
+import jwt from "jsonwebtoken";
+import { config } from "../config/index.js";
 
 export const suggest = async (req, res, next) => {
   try {
     const { q } = req.query;
     if (!q || q.trim().length < 2) {
-      return res.status(400).json({ error: 'Query must be at least 2 characters long' });
+      return res
+        .status(400)
+        .json({ error: "Query must be at least 2 characters long" });
     }
 
     const queryText = q.trim();
     let userId = null;
     const authHeader = req.headers.authorization;
 
-    if (authHeader?.startsWith('Bearer ')) {
+    if (authHeader?.startsWith("Bearer ")) {
       try {
-        const token = authHeader.split(' ')[1];
+        const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, config.JWT_SECRET);
         userId = decoded.id;
       } catch {
@@ -23,7 +25,7 @@ export const suggest = async (req, res, next) => {
       }
     }
 
-    let query = '';
+    let query = "";
     let params = [];
 
     if (userId) {
@@ -86,11 +88,13 @@ export const suggest = async (req, res, next) => {
     }
 
     const result = await pool.query(query, params);
-    res.json(result.rows.map(row => ({
-      id: row.product_id,
-      name: row.name,
-      category: row.category,
-    })));
+    res.json(
+      result.rows.map((row) => ({
+        id: row.product_id,
+        name: row.name,
+        category: row.category,
+      })),
+    );
   } catch (error) {
     next(error);
   }
@@ -99,20 +103,27 @@ export const suggest = async (req, res, next) => {
 export const understandSearchIntent = async (req, res, next) => {
   try {
     const { q } = req.query;
-    if (!q || typeof q !== 'string' || q.trim() === '') {
-      return res.status(400).json({ error: 'Valid query is required' });
+    if (!q || typeof q !== "string" || q.trim() === "") {
+      return res.status(400).json({ error: "Valid query is required" });
     }
-    
-    const INPUT_UNDERSTANDING_SERVICE_URL = process.env.INPUT_UNDERSTANDING_SERVICE_URL || 'http://localhost:8002';
+
+    const rawServiceUrl =
+      process.env.INPUT_UNDERSTANDING_SERVICE_URL || "http://localhost:8002";
+    const inputUnderstandingServiceUrl = rawServiceUrl.includes("://")
+      ? rawServiceUrl
+      : `http://${rawServiceUrl}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1000);
     try {
-      const response = await fetch(`${INPUT_UNDERSTANDING_SERVICE_URL}/understand`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-        signal: controller.signal
-      });
+      const response = await fetch(
+        `${inputUnderstandingServiceUrl}/understand`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q }),
+          signal: controller.signal,
+        },
+      );
       if (response.ok) {
         const data = await response.json();
         return res.json(data);
@@ -122,7 +133,11 @@ export const understandSearchIntent = async (req, res, next) => {
     } finally {
       clearTimeout(timeout);
     }
-    return res.json({ intent: 'product_search', query: q, category_hint: null });
+    return res.json({
+      intent: "product_search",
+      query: q,
+      category_hint: null,
+    });
   } catch (error) {
     next(error);
   }

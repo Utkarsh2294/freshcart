@@ -1,0 +1,70 @@
+services:
+  - type: web
+    name: freshcart
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: freshcart-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: GROQ_TIMEOUT_MS
+        value: "12000"
+      - key: RECOMMENDATION_SERVICE_URL
+        fromService:
+          type: web
+          name: freshcart-recommendation
+          property: hostport
+      - key: INPUT_UNDERSTANDING_SERVICE_URL
+        fromService:
+          type: web
+          name: freshcart-input-understanding
+          property: hostport
+
+  - type: web
+    name: freshcart-recommendation
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./ai-services/recommendation-service/Dockerfile
+    dockerContext: ./ai-services/recommendation-service
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: freshcart-db
+          property: connectionString
+
+  - type: web
+    name: freshcart-input-understanding
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./ai-services/input-understanding-service/Dockerfile
+    dockerContext: ./ai-services/input-understanding-service
+    healthCheckPath: /health
+
+databases:
+  - name: freshcart-db
+    plan: free
+    region: singapore
+    databaseName: freshcart
+    user: freshcart

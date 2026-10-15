@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { config } from "./config/index.js";
 import { pool } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -62,6 +64,29 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/referral", referralRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
+
+if (config.NODE_ENV === "production") {
+  const frontendDirectory = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "frontend",
+    "dist",
+  );
+
+  app.use(express.static(frontendDirectory, { index: false, maxAge: "1y" }));
+  app.use((req, res, next) => {
+    if (
+      req.method !== "GET" ||
+      req.path.startsWith("/api/") ||
+      !req.accepts("html")
+    ) {
+      return next();
+    }
+    res.set("Cache-Control", "no-cache");
+    return res.sendFile(join(frontendDirectory, "index.html"));
+  });
+}
 
 app.use(errorHandler);
 
