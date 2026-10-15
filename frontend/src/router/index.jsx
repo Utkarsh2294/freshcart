@@ -1,7 +1,6 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import AppShell from "../components/layout/AppShell";
-import ProtectedRoute from "./ProtectedRoute";
 import AdminRoute from "./AdminRoute";
 
 const Home = lazy(() => import("../pages/Home"));
@@ -14,7 +13,6 @@ const OrderTracking = lazy(() => import("../pages/OrderTracking"));
 const WalletPayments = lazy(() => import("../pages/WalletPayments"));
 const CookThis = lazy(() => import("../pages/CookThis"));
 const RecipeResult = lazy(() => import("../pages/RecipeResult"));
-const Auth = lazy(() => import("../pages/Auth"));
 const AdminDashboard = lazy(() => import("../pages/admin/Dashboard"));
 const ProductManagement = lazy(
   () => import("../pages/admin/ProductManagement"),
@@ -36,10 +34,6 @@ const page = (Component) => (
   </Suspense>
 );
 
-const protectedPage = (Component) => (
-  <ProtectedRoute>{page(Component)}</ProtectedRoute>
-);
-
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -48,22 +42,18 @@ export const router = createBrowserRouter([
       { index: true, element: page(Home) },
       { path: "search", element: page(SearchCategory) },
       { path: "product/:id", element: page(ProductDetail) },
-      { path: "cook-this", element: protectedPage(CookThis) },
+      { path: "cook-this", element: page(CookThis) },
       { path: "recipe-result", element: page(RecipeResult) },
       { path: "cart", element: page(Cart) },
-      { path: "checkout", element: protectedPage(Checkout) },
-      { path: "orders", element: protectedPage(OrderHistory) },
-      { path: "orders/:id", element: protectedPage(OrderTracking) },
-      { path: "wallet", element: protectedPage(WalletPayments) },
+      { path: "checkout", element: page(Checkout) },
+      { path: "orders", element: page(OrderHistory) },
+      { path: "orders/:id", element: page(OrderTracking) },
+      { path: "wallet", element: page(WalletPayments) },
       {
         path: "notifications",
-        element: protectedPage(NotificationPreferences),
+        element: page(NotificationPreferences),
       },
     ],
-  },
-  {
-    path: "/auth",
-    element: page(Auth),
   },
   {
     path: "/admin",

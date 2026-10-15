@@ -1,31 +1,26 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { Minus, Plus } from 'lucide-react';
-import { useCartStore } from '../../store/cartStore';
-import { useAuth } from '../../hooks/useAuth';
-import { getProductImage } from '../../utils/productImages';
-import { formatPrice } from '../../utils/formatters';
+import { useState } from "react";
+import { Link } from "react-router";
+import { Minus, Plus } from "lucide-react";
+import { useCartStore } from "../../store/cartStore";
+import { getProductImage } from "../../utils/productImages";
+import { formatPrice } from "../../utils/formatters";
 
 export default function ProductCard({ product }) {
   const { items, addItem, updateItem, removeItem } = useCartStore();
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const productId = product.id ?? product._id;
-  const cartItem = items.find(item => String(item.productId) === String(productId));
+  const cartItem = items.find(
+    (item) => String(item.productId) === String(productId),
+  );
   const qty = cartItem ? cartItem.quantity : 0;
   const imageSrc = getProductImage(product);
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     setIsLoading(true);
     try {
       if (qty === 0) {
-        await addItem(productId, 1, 'manual');
+        await addItem(productId, 1, "manual");
       } else {
         await updateItem(cartItem._id, qty + 1);
       }
@@ -36,10 +31,6 @@ export default function ProductCard({ product }) {
 
   const handleRemove = async (e) => {
     e.preventDefault();
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     if (qty === 0) return;
     setIsLoading(true);
     try {
@@ -59,7 +50,11 @@ export default function ProductCard({ product }) {
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="relative aspect-square bg-[var(--bg-surface)] p-4">
-        <img src={imageSrc} alt={product.name} className="h-full w-full rounded-xl object-contain" />
+        <img
+          src={imageSrc}
+          alt={product.name}
+          className="h-full w-full rounded-xl object-contain"
+        />
         {product.discount > 0 && (
           <div className="absolute left-3 top-3 rounded-md bg-[#22C55E] px-2 py-1 text-xs font-bold text-white">
             {product.discount}% OFF
@@ -68,27 +63,43 @@ export default function ProductCard({ product }) {
       </div>
 
       <div className="flex flex-1 flex-col p-3">
-        <span className="mb-1 text-xs text-[var(--text-secondary)]">{product.brand || product.category}</span>
+        <span className="mb-1 text-xs text-[var(--text-secondary)]">
+          {product.brand || product.category}
+        </span>
         <h3 className="mb-1 line-clamp-2 min-h-[40px] text-sm font-semibold tracking-normal text-[var(--text-primary)]">
           {product.name}
         </h3>
-        <span className="mb-3 text-xs text-[var(--text-secondary)]">{product.unit}</span>
+        <span className="mb-3 text-xs text-[var(--text-secondary)]">
+          {product.unit}
+        </span>
 
         <div className="mt-auto flex items-end justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <span className="font-bold text-[var(--text-primary)]">{formatPrice(product.price)}</span>
+            <span className="font-bold text-[var(--text-primary)]">
+              {formatPrice(product.price)}
+            </span>
             {product.mrp > product.price && (
-              <span className="text-xs text-[var(--text-secondary)] line-through">{formatPrice(product.mrp)}</span>
+              <span className="text-xs text-[var(--text-secondary)] line-through">
+                {formatPrice(product.mrp)}
+              </span>
             )}
           </div>
 
           {qty > 0 ? (
             <div className="grid h-9 grid-cols-[32px_30px_32px] items-center rounded-lg border border-[#C4B5FD] bg-[#F5F3FF] text-[#6366F1] dark:border-[#4C1D95] dark:bg-[#312E81]/30 dark:text-[#C4B5FD]">
-              <button disabled={isLoading} onClick={handleRemove} className="flex h-full items-center justify-center rounded-l-lg disabled:opacity-50">
+              <button
+                disabled={isLoading}
+                onClick={handleRemove}
+                className="flex h-full items-center justify-center rounded-l-lg disabled:opacity-50"
+              >
                 <Minus className="h-4 w-4" />
               </button>
               <span className="text-center text-sm font-bold">{qty}</span>
-              <button disabled={isLoading} onClick={handleAdd} className="flex h-full items-center justify-center rounded-r-lg disabled:opacity-50">
+              <button
+                disabled={isLoading}
+                onClick={handleAdd}
+                className="flex h-full items-center justify-center rounded-r-lg disabled:opacity-50"
+              >
                 <Plus className="h-4 w-4" />
               </button>
             </div>

@@ -1,29 +1,45 @@
-import { describe, expect, it } from 'vitest';
-import request from 'supertest';
-import app from '../../src/app.js';
+import { describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import request from "supertest";
+import app from "../../src/app.js";
 
 const db = () => globalThis.__FRESHCART_DB_AVAILABLE__;
 
-describe.skipIf(!db())('Auth API', () => {
-  it('POST /api/auth/register rejects invalid email', async () => {
+describe.skipIf(!db())("Auth API", () => {
+  it("POST /api/auth/guest reuses a stable anonymous shopper", async () => {
+    const guestKey = randomUUID();
+    const first = await request(app)
+      .post("/api/auth/guest")
+      .send({ guest_key: guestKey });
+    const second = await request(app)
+      .post("/api/auth/guest")
+      .send({ guest_key: guestKey });
+
+    expect(first.status).toBe(200);
+    expect(first.body.accessToken).toBeTruthy();
+    expect(first.body.user.role).toBe("customer");
+    expect(second.body.user.id).toBe(first.body.user.id);
+  });
+
+  it("POST /api/auth/register rejects invalid email", async () => {
     const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Test User', email: 'bad-email', password: 'password123' });
+      .post("/api/auth/register")
+      .send({ name: "Test User", email: "bad-email", password: "password123" });
     expect(res.status).toBe(400);
   });
 
-  it('POST /api/auth/login rejects wrong password', async () => {
+  it("POST /api/auth/login rejects wrong password", async () => {
     const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'customer@freshcart.local', password: 'wrong-password' });
+      .post("/api/auth/login")
+      .send({ email: "customer@freshcart.local", password: "wrong-password" });
     expect(res.status).toBe(401);
   });
 
-  it('POST /api/auth/login returns tokens for seeded customer', async () => {
+  it("POST /api/auth/login returns tokens for seeded customer", async () => {
     const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'customer@freshcart.local', password: 'password123' });
+      .post("/api/auth/login")
+      .send({ email: "customer@freshcart.local", password: "password123" });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
+    expect(res.body).toHaveProperty("accessToken");
   });
 });

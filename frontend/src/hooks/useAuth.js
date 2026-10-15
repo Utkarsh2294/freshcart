@@ -1,14 +1,12 @@
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from "../store/authStore";
 
 export const useAuth = () => {
-  const { user, token, isAuthenticated, login, logout, setUser } = useAuthStore();
-  
+  const { user, token, isAuthenticated, login } = useAuthStore();
+
   return {
     user,
     token,
     isAuthenticated,
     login,
-    logout,
-    setUser
   };
 };
