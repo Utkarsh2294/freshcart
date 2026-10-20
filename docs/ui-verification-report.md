@@ -49,6 +49,8 @@ Production UI checks use intercepted API fixtures: image failure, add-to-cart wi
 
 GitHub CI provisions PostgreSQL, applies migrations, seeds data and runs the integration suite. The final workflow additionally builds the production Docker image and starts it against that database, checking `/api/health` and the served storefront. Use the final commit's green Actions run as the container/integration result; local Docker Desktop was unavailable.
 
+The new production gate caught CI inheriting `NODE_ENV=test` during the Vite build, which retained development fixtures. The build step now explicitly uses `NODE_ENV=production`; tests retain their test environment. The fixture-exclusion assertion remains enabled.
+
 ## Commits
 
 - `21bd007`: responsive shopping and checkout accessibility.
