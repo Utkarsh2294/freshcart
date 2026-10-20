@@ -26,14 +26,12 @@ export default function ProductCard({ product }) {
         await updateItem(cartItem._id, qty + 1);
       }
     } catch (error) {
-      useUiStore
-        .getState()
-        .addToast({
-          type: "error",
-          message:
-            error.response?.data?.error ||
-            "Could not update your cart. Try again.",
-        });
+      useUiStore.getState().addToast({
+        type: "error",
+        message:
+          error.response?.data?.error ||
+          "Could not update your cart. Try again.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -50,14 +48,12 @@ export default function ProductCard({ product }) {
         await updateItem(cartItem._id, qty - 1);
       }
     } catch (error) {
-      useUiStore
-        .getState()
-        .addToast({
-          type: "error",
-          message:
-            error.response?.data?.error ||
-            "Could not update your cart. Try again.",
-        });
+      useUiStore.getState().addToast({
+        type: "error",
+        message:
+          error.response?.data?.error ||
+          "Could not update your cart. Try again.",
+      });
     } finally {
       setIsLoading(false);
     }

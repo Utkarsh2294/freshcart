@@ -42,14 +42,12 @@ export default function CartDrawer() {
       await swapItem(swapState.item._id, option);
       setSwapState({ isOpen: false, options: [] });
     } catch (error) {
-      useUiStore
-        .getState()
-        .addToast({
-          type: "error",
-          message:
-            error.response?.data?.error ||
-            "Swap failed. Your cart has been restored.",
-        });
+      useUiStore.getState().addToast({
+        type: "error",
+        message:
+          error.response?.data?.error ||
+          "Swap failed. Your cart has been restored.",
+      });
       setSwapState((state) => ({ ...state, isSwapping: false }));
     }
   };

@@ -13,14 +13,12 @@ export default function CartLine({ item, onSwap }) {
       if (quantity === 0) await removeItem(item._id);
       else await updateItem(item._id, quantity);
     } catch (error) {
-      useUiStore
-        .getState()
-        .addToast({
-          type: "error",
-          message:
-            error.response?.data?.error ||
-            "Could not update this item. Try again.",
-        });
+      useUiStore.getState().addToast({
+        type: "error",
+        message:
+          error.response?.data?.error ||
+          "Could not update this item. Try again.",
+      });
     }
   };
   return (
