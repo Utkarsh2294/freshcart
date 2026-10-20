@@ -8,7 +8,9 @@
     color-scheme: light;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
-    scroll-padding-top: calc(5rem + env(safe-area-inset-top, 0px));
+    scroll-padding-top: calc(
+      var(--top-bar-h) + 1rem + env(safe-area-inset-top, 0px)
+    );
   }
 
   body.dark {
@@ -179,11 +181,6 @@
   }
   .product-card .money {
     font-size: 0.875rem;
-  }
-  @media (max-width: 639px) {
-    :root {
-      --top-bar-h: 7.5rem;
-    }
   }
   .cooking-dialog[open] {
     display: flex;

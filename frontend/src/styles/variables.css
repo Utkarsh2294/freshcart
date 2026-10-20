@@ -119,6 +119,13 @@
   --badge-nomatch-text: #e53e3e;
 }
 
+/* Keep the mobile override unlayered, like the desktop default above. */
+@media (width < 40rem) {
+  :root {
+    --top-bar-h: 7.5rem;
+  }
+}
+
 /* ── Dark Mode Overrides ──────────────────────── */
 .dark {
   --bg-app: #08090c;
