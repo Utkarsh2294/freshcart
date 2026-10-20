@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   MapPin,
@@ -17,20 +17,30 @@ import { useCartStore } from "../../store/cartStore";
 import { useUiStore } from "../../store/uiStore";
 import { useAuth } from "../../hooks/useAuth";
 
-export default function Header({ onMenuClick }) {
+export default function Header({ onMenuClick, sidebarOpen }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const cartItems = useCartStore((state) => state.items);
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const { isDarkMode, toggleTheme } = useUiStore();
   const { user } = useAuth();
+  const accountRef = useRef(null);
+  useEffect(() => {
+    const dismiss = (event) => {
+      if (!accountRef.current?.contains(event.target)) setIsUserMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-[var(--border-default)] bg-[var(--bg-nav)] backdrop-blur-xl">
+    <header className="app-header fixed inset-x-0 top-0 z-50 border-b border-[var(--border-default)] bg-[var(--bg-nav)] backdrop-blur-xl">
       <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-3 px-4 lg:px-8">
-        <div className="flex items-center gap-4 lg:w-64">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={onMenuClick}
-            className="rounded-lg p-2 -ml-2 transition-colors hover:bg-[var(--bg-surface)] lg:hidden"
+            aria-label="Open navigation"
+            aria-expanded={sidebarOpen}
+            className="icon-button -ml-2 hover:bg-[var(--bg-surface)] lg:hidden"
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -42,24 +52,30 @@ export default function Header({ onMenuClick }) {
           </Link>
         </div>
 
-        <div className="flex flex-1 items-center justify-center gap-4 px-1 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-4 sm:px-4">
           <SearchBar />
 
-          <div className="hidden items-center gap-2 rounded-xl p-2 transition-colors hover:bg-[var(--bg-surface)] xl:flex">
+          <Link
+            to="/checkout"
+            className="hidden shrink-0 items-center gap-2 rounded-xl p-2 xl:flex"
+          >
             <MapPin className="h-5 w-5 text-[#8B5CF6]" />
             <div className="flex flex-col text-xs">
               <span className="text-[var(--text-secondary)]">Deliver to</span>
               <span className="flex items-center gap-1 font-semibold text-[var(--text-primary)]">
-                Home - 17, Green Park <ChevronDown className="h-3 w-3" />
+                Choose at checkout <ChevronDown className="h-3 w-3" />
               </span>
             </div>
-          </div>
+          </Link>
         </div>
 
-        <div className="flex items-center justify-end gap-2 lg:w-64 lg:gap-4">
+        <div className="flex shrink-0 items-center justify-end gap-1 lg:gap-3">
           <button
             onClick={toggleTheme}
-            className="rounded-full p-2 transition-colors hover:bg-[var(--bg-surface)]"
+            aria-label={
+              isDarkMode ? "Switch to light theme" : "Switch to dark theme"
+            }
+            className="icon-button hover:bg-[var(--bg-surface)]"
             title="Toggle theme"
           >
             {isDarkMode ? (
@@ -70,26 +86,46 @@ export default function Header({ onMenuClick }) {
           </button>
           <Link
             to="/cart"
-            className="relative rounded-full p-2 transition-colors hover:bg-[var(--bg-surface)] lg:hidden"
+            aria-label={`Cart, ${cartCount} items`}
+            className="icon-button relative hover:bg-[var(--bg-surface)]"
           >
             <ShoppingCart className="h-6 w-6" />
             {cartCount > 0 && (
               <span className="absolute right-0 top-0 inline-flex min-w-5 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold leading-none text-white">
-                {cartCount}
+                {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
           </Link>
-          <div className="relative hidden items-center gap-3 lg:flex">
+          <div
+            ref={accountRef}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setIsUserMenuOpen(false);
+                accountRef.current?.querySelector("button")?.focus();
+              }
+            }}
+            className="relative hidden items-center gap-3 lg:flex"
+          >
             <button
               type="button"
               onClick={() => setIsUserMenuOpen((open) => !open)}
               className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[var(--bg-surface)]"
               title="Account menu"
+              aria-label="Shopping account links"
+              aria-expanded={isUserMenuOpen}
+              aria-controls="account-links"
             >
               <User className="h-5 w-5 text-[var(--text-secondary)]" />
             </button>
             {isUserMenuOpen && (
-              <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] shadow-xl">
+              <div
+                id="account-links"
+                className="account-popover absolute right-0 top-12 w-64 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] shadow-xl"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget))
+                    setIsUserMenuOpen(false);
+                }}
+              >
                 <div className="border-b border-[var(--border-default)] p-4">
                   <p className="font-bold text-[var(--text-primary)]">
                     {user?.name || "Guest shopper"}

@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import * as cartService from '../services/cartService';
-import { applyOptimisticSwap, cartTotal } from './cartSwap';
+import { create } from "zustand";
+import * as cartService from "../services/cartService";
+import { applyOptimisticSwap, cartTotal } from "./cartSwap";
 
 export const useCartStore = create((set, get) => ({
   items: [],
@@ -8,9 +8,11 @@ export const useCartStore = create((set, get) => ({
   walletBalance: 0,
   darkStoreId: null,
   isLoading: false,
+  pendingItems: [],
+  error: "",
 
   fetchCart: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: "" });
     try {
       const data = await cartService.getCart();
       set({
@@ -20,13 +22,13 @@ export const useCartStore = create((set, get) => ({
         darkStoreId: data.darkStoreId,
       });
     } catch (err) {
-      console.error(err);
+      set({ error: "Your cart could not be loaded. Please try again." });
     } finally {
       set({ isLoading: false });
     }
   },
 
-  addItem: async (productId, qty = 1, source = 'manual') => {
+  addItem: async (productId, qty = 1, source = "manual") => {
     try {
       await cartService.addItem(productId, qty, source);
       await get().fetchCart();
@@ -37,22 +39,36 @@ export const useCartStore = create((set, get) => ({
   },
 
   updateItem: async (itemId, qty) => {
+    const key = String(itemId);
+    if (get().pendingItems.includes(key)) return;
+    set((state) => ({ pendingItems: [...state.pendingItems, key] }));
     try {
       await cartService.updateItem(itemId, qty);
       await get().fetchCart();
     } catch (err) {
       console.error(err);
       throw err;
+    } finally {
+      set((state) => ({
+        pendingItems: state.pendingItems.filter((id) => id !== key),
+      }));
     }
   },
 
   removeItem: async (itemId) => {
+    const key = String(itemId);
+    if (get().pendingItems.includes(key)) return;
+    set((state) => ({ pendingItems: [...state.pendingItems, key] }));
     try {
       await cartService.removeItem(itemId);
       await get().fetchCart();
     } catch (err) {
       console.error(err);
       throw err;
+    } finally {
+      set((state) => ({
+        pendingItems: state.pendingItems.filter((id) => id !== key),
+      }));
     }
   },
 

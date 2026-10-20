@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Minus, Plus } from "lucide-react";
 import { useCartStore } from "../../store/cartStore";
-import { getProductImage } from "../../utils/productImages";
+import ProductImage from "./ProductImage";
+import { useUiStore } from "../../store/uiStore";
 import { formatPrice } from "../../utils/formatters";
 
 export default function ProductCard({ product }) {
@@ -13,10 +14,10 @@ export default function ProductCard({ product }) {
     (item) => String(item.productId) === String(productId),
   );
   const qty = cartItem ? cartItem.quantity : 0;
-  const imageSrc = getProductImage(product);
 
   const handleAdd = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     try {
       if (qty === 0) {
@@ -24,6 +25,15 @@ export default function ProductCard({ product }) {
       } else {
         await updateItem(cartItem._id, qty + 1);
       }
+    } catch (error) {
+      useUiStore
+        .getState()
+        .addToast({
+          type: "error",
+          message:
+            error.response?.data?.error ||
+            "Could not update your cart. Try again.",
+        });
     } finally {
       setIsLoading(false);
     }
@@ -31,7 +41,7 @@ export default function ProductCard({ product }) {
 
   const handleRemove = async (e) => {
     e.preventDefault();
-    if (qty === 0) return;
+    if (qty === 0 || isLoading) return;
     setIsLoading(true);
     try {
       if (qty === 1) {
@@ -39,20 +49,30 @@ export default function ProductCard({ product }) {
       } else {
         await updateItem(cartItem._id, qty - 1);
       }
+    } catch (error) {
+      useUiStore
+        .getState()
+        .addToast({
+          type: "error",
+          message:
+            error.response?.data?.error ||
+            "Could not update your cart. Try again.",
+        });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Link
-      to={`/product/${productId}`}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <div className="relative aspect-square bg-[var(--bg-surface)] p-4">
-        <img
-          src={imageSrc}
-          alt={product.name}
+    <article className="product-card flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] shadow-sm">
+      <Link
+        to={`/product/${productId}`}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="relative block aspect-square bg-[var(--bg-surface)] p-4"
+      >
+        <ProductImage
+          product={product}
           className="h-full w-full rounded-xl object-contain"
         />
         {product.discount > 0 && (
@@ -60,21 +80,23 @@ export default function ProductCard({ product }) {
             {product.discount}% OFF
           </div>
         )}
-      </div>
+      </Link>
 
       <div className="flex flex-1 flex-col p-3">
         <span className="mb-1 text-xs text-[var(--text-secondary)]">
           {product.brand || product.category}
         </span>
-        <h3 className="mb-1 line-clamp-2 min-h-[40px] text-sm font-semibold tracking-normal text-[var(--text-primary)]">
-          {product.name}
+        <h3 className="mb-1 line-clamp-2 min-h-[40px] break-words text-sm font-semibold tracking-normal text-[var(--text-primary)]">
+          <Link to={`/product/${productId}`} title={product.name}>
+            {product.name}
+          </Link>
         </h3>
         <span className="mb-3 text-xs text-[var(--text-secondary)]">
           {product.unit}
         </span>
 
-        <div className="mt-auto flex items-end justify-between gap-3">
-          <div className="flex min-w-0 flex-col">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-2">
+          <div className="money flex min-w-0 flex-col">
             <span className="font-bold text-[var(--text-primary)]">
               {formatPrice(product.price)}
             </span>
@@ -86,18 +108,20 @@ export default function ProductCard({ product }) {
           </div>
 
           {qty > 0 ? (
-            <div className="grid h-9 grid-cols-[32px_30px_32px] items-center rounded-lg border border-[#C4B5FD] bg-[#F5F3FF] text-[#6366F1] dark:border-[#4C1D95] dark:bg-[#312E81]/30 dark:text-[#C4B5FD]">
+            <div className="grid min-h-11 grid-cols-[40px_minmax(24px,auto)_40px] items-center rounded-lg border border-[#C4B5FD] bg-[#F5F3FF] text-[#6366F1] dark:border-[#4C1D95] dark:bg-[#312E81]/30 dark:text-[#C4B5FD]">
               <button
                 disabled={isLoading}
                 onClick={handleRemove}
+                aria-label={`Remove one ${product.name}`}
                 className="flex h-full items-center justify-center rounded-l-lg disabled:opacity-50"
               >
                 <Minus className="h-4 w-4" />
               </button>
               <span className="text-center text-sm font-bold">{qty}</span>
               <button
-                disabled={isLoading}
+                disabled={isLoading || qty >= product.stockQty || qty >= 50}
                 onClick={handleAdd}
+                aria-label={`Add one ${product.name}`}
                 className="flex h-full items-center justify-center rounded-r-lg disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
@@ -107,13 +131,14 @@ export default function ProductCard({ product }) {
             <button
               disabled={isLoading || !product.inStock}
               onClick={handleAdd}
-              className="h-9 rounded-lg border border-[#C4B5FD] bg-[#F5F3FF] px-4 text-sm font-bold text-[#6366F1] transition-colors hover:bg-[#EDE9FE] disabled:opacity-50 dark:border-[#4C1D95] dark:bg-[#312E81]/30 dark:text-[#C4B5FD] dark:hover:bg-[#312E81]/50"
+              aria-label={`Add ${product.name} to cart`}
+              className="press-feedback min-h-11 rounded-lg border border-[#C4B5FD] bg-[#F5F3FF] px-4 text-sm font-bold text-[#6366F1] hover:bg-[#EDE9FE] disabled:opacity-50 dark:border-[#4C1D95] dark:bg-[#312E81]/30 dark:text-[#C4B5FD] dark:hover:bg-[#312E81]/50"
             >
-              Add
+              {product.inStock ? (isLoading ? "Adding…" : "Add") : "Sold out"}
             </button>
           )}
         </div>
       </div>
-    </Link>
+    </article>
   );
 }

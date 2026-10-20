@@ -15,6 +15,9 @@ logs
 
 # Coverage
 coverage
+tmp/
+.pytest_cache/
+pytest-cache-files-*/
 
 # Build artifacts
 *.tgz

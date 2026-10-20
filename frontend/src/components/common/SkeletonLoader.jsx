@@ -1,7 +1,10 @@
-export default function SkeletonLoader({ type = 'product' }) {
-  if (type === 'product') {
+export default function SkeletonLoader({ type = "product", className = "" }) {
+  if (type === "product") {
     return (
-      <div className="animate-pulse bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-64">
+      <div
+        aria-hidden="true"
+        className={`animate-pulse bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-64 ${className}`}
+      >
         <div className="w-full h-32 bg-gray-200 dark:bg-gray-700" />
         <div className="p-4 space-y-3">
           <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4" />
@@ -12,7 +15,7 @@ export default function SkeletonLoader({ type = 'product' }) {
       </div>
     );
   }
-  
+
   return (
     <div className="animate-pulse">
       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>

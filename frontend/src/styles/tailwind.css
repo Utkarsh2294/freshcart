@@ -1,11 +1,14 @@
-@import './variables.css';
-@import 'tailwindcss';
+@import "./variables.css";
+@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   html {
     color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: calc(5rem + env(safe-area-inset-top, 0px));
   }
 
   body.dark {
@@ -13,8 +16,7 @@
   }
 
   body {
-    min-height: 100vh;
-    overflow-x: hidden;
+    min-height: 100dvh;
     background: var(--bg-app);
     color: var(--text-primary);
     font-family: var(--font-sans);
@@ -40,6 +42,144 @@
   textarea,
   select {
     color: var(--text-primary);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--border-focus);
+    outline-offset: 3px;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  button,
+  [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  button:not(:disabled),
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer components {
+  .app-shell {
+    min-height: 100dvh;
+  }
+  .app-header {
+    height: calc(4rem + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .app-layout {
+    min-height: 100dvh;
+    padding-top: calc(4rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mobile-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+  .cart-rail {
+    position: sticky;
+    top: calc(4rem + env(safe-area-inset-top, 0px));
+    height: calc(100dvh - 4rem - env(safe-area-inset-top, 0px));
+  }
+  .skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 400;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 0.75rem;
+    transform: translateY(-150%);
+  }
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+  .money {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .icon-button {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 0.75rem;
+  }
+  .dialog-surface {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    padding: 0;
+    width: min(32.5rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    color: var(--text-primary);
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .dialog-surface::backdrop {
+    background: var(--bg-overlay);
+  }
+  body:has(dialog[open]) {
+    overflow: hidden;
+  }
+  .dialog-sheet {
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 40rem;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .dialog-menu {
+    inset: 0 auto 0 0;
+    margin: 0;
+    width: min(20rem, calc(100% - 2rem));
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0 1.5rem 1.5rem 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .content-wrap {
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 768px) {
+    .dialog-sheet {
+      margin: auto;
+      width: calc(100% - 2rem);
+      border-radius: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .app-layout {
+      padding-bottom: 0;
+    }
   }
 }
 

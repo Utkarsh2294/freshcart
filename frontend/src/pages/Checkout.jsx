@@ -1,118 +1,242 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useCartStore } from '../store/cartStore';
-import { useOrderStore } from '../store/orderStore';
-import Button from '../components/common/Button';
-import Input from '../components/common/Input';
-import { formatPrice } from '../utils/formatters';
-import { useUiStore } from '../store/uiStore';
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { useCartStore } from "../store/cartStore";
+import { useOrderStore } from "../store/orderStore";
+import { useWalletStore } from "../store/walletStore";
+import Button from "../components/common/Button";
+import Input from "../components/common/Input";
+import { formatPrice } from "../utils/formatters";
+import { useUiStore } from "../store/uiStore";
 
 export default function Checkout() {
-  const { items, total, clearCart } = useCartStore();
+  const {
+    items,
+    total,
+    clearCart,
+    fetchCart,
+    isLoading,
+    error: cartError,
+    pendingItems,
+  } = useCartStore();
   const { createOrder } = useOrderStore();
-  const { addToast } = useUiStore();
+  const { balance, fetchWallet } = useWalletStore();
   const navigate = useNavigate();
-
   const [step, setStep] = useState(1);
   const [address, setAddress] = useState({
-    street: '123 Main St',
-    city: 'Mumbai',
-    state: 'MH',
-    zip: '400001'
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
   });
-  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [applyWallet, setApplyWallet] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  if (!items.length) {
-    return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 text-center">
-        <h1 className="text-2xl font-bold tracking-normal text-[var(--text-primary)]">Your cart is empty</h1>
-        <p className="text-[var(--text-secondary)]">Add a few products before checking out.</p>
-        <Link to="/cart" className="rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] px-5 py-3 font-bold text-white">
-          Back to Cart
-        </Link>
-      </div>
-    );
-  }
+  const [error, setError] = useState("");
+  const submitting = useRef(false);
+  useEffect(() => {
+    fetchCart();
+    fetchWallet();
+  }, [fetchCart, fetchWallet]);
+  const walletCredit = applyWallet
+    ? Math.min(balance, Number((total * 0.5).toFixed(2)))
+    : 0;
 
   const handlePlaceOrder = async () => {
+    if (submitting.current || pendingItems.length || cartError) return;
+    submitting.current = true;
     setIsProcessing(true);
+    setError("");
     try {
       const order = await createOrder({
         address,
-        payment_method: paymentMethod,
-        apply_wallet: paymentMethod === 'wallet',
+        payment_method: "cod",
+        apply_wallet: applyWallet,
       });
-      
       clearCart();
-      addToast({ type: 'success', message: 'Order placed successfully!' });
+      useUiStore
+        .getState()
+        .addToast({ type: "success", message: "Your order has been placed." });
       navigate(`/orders/${order.id}`);
-    } catch (err) {
-      addToast({ type: 'error', message: 'Failed to place order.' });
+    } catch (error) {
+      setError(
+        error.response?.data?.error ||
+          "Your order could not be placed. Please try again.",
+      );
     } finally {
+      submitting.current = false;
       setIsProcessing(false);
     }
   };
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-[var(--text-primary)]">Checkout</h1>
-      
-      <div className="bg-[var(--bg-card)] p-6 lg:p-8 rounded-3xl shadow-sm border border-[var(--border-default)]">
-        <h2 className="text-lg font-bold mb-6 flex items-center gap-3 text-[var(--text-primary)]">
-          <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold text-white ${step >= 1 ? 'bg-gradient-to-br from-[#8B5CF6] to-[#EC4899] shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-500'}`}>1</span>
-          Delivery Address
-        </h2>
-        {step === 1 ? (
-          <div className="space-y-5">
-            <Input label="Street Address" value={address.street} onChange={e => setAddress({...address, street: e.target.value})} className="bg-gray-50 dark:bg-[#0F111A] border-none" />
-            <div className="grid grid-cols-2 gap-5">
-              <Input label="City" value={address.city} onChange={e => setAddress({...address, city: e.target.value})} className="bg-gray-50 dark:bg-[#0F111A] border-none" />
-              <Input label="PIN Code" value={address.zip} onChange={e => setAddress({...address, zip: e.target.value})} className="bg-gray-50 dark:bg-[#0F111A] border-none" />
-            </div>
-            <button onClick={() => setStep(2)} className="mt-4 px-8 py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold transition-colors">Continue to Payment</button>
-          </div>
-        ) : (
-          <div className="text-sm text-[var(--text-secondary)] bg-[var(--bg-surface)] p-4 rounded-xl flex justify-between items-center">
-            <span>{address.street}, {address.city}, {address.zip}</span>
-            <button onClick={() => setStep(1)} className="text-[#8B5CF6] font-semibold hover:text-[#7C3AED] transition-colors">Edit</button>
-          </div>
-        )}
+  if (isLoading && !items.length)
+    return (
+      <p role="status" className="p-8 text-center">
+        Loading your cart…
+      </p>
+    );
+  if (!items.length || cartError)
+    return (
+      <div className="mx-auto flex min-h-64 max-w-md flex-col items-center justify-center gap-4 text-center">
+        <h1 className="text-2xl font-bold">
+          {cartError ? "Your cart is unavailable" : "Your cart is empty"}
+        </h1>
+        <p>{cartError || "Add a few products before checking out."}</p>
+        {cartError && <Button onClick={fetchCart}>Try again</Button>}
+        <Link
+          to="/cart"
+          className="min-h-11 rounded-xl bg-[#6366F1] px-5 py-3 font-bold text-white"
+        >
+          Back to cart
+        </Link>
       </div>
+    );
 
-      <div className="bg-[var(--bg-card)] p-6 lg:p-8 rounded-3xl shadow-sm border border-[var(--border-default)]">
-        <h2 className="text-lg font-bold mb-6 flex items-center gap-3 text-[var(--text-primary)]">
-          <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold text-white ${step >= 2 ? 'bg-gradient-to-br from-[#EC4899] to-[#F97316] shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-500'}`}>2</span>
-          Payment Method
-        </h2>
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="space-y-3">
-              {[
-                { value: 'cod', label: 'Cash on Delivery' },
-                { value: 'razorpay', label: 'Razorpay / UPI / Card' },
-                { value: 'wallet', label: 'Wallet' },
-                { value: 'bnpl', label: 'BNPL' },
-              ].map(method => (
-                <label key={method.value} className={`flex items-center p-4 rounded-2xl cursor-pointer transition-all border ${paymentMethod === method.value ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 dark:bg-[#8B5CF6]/10' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-transparent'}`}>
-                  <input type="radio" name="payment" value={method.value} checked={paymentMethod === method.value} onChange={() => setPaymentMethod(method.value)} className="text-[#8B5CF6] focus:ring-[#8B5CF6] bg-transparent" />
-                  <span className={`ml-3 font-semibold ${paymentMethod === method.value ? 'text-[#8B5CF6]' : 'text-gray-700 dark:text-gray-300'}`}>{method.label}</span>
-                </label>
-              ))}
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <p className="mb-1 text-sm font-semibold text-[#6366F1] dark:text-[#C4B5FD]">
+          One last step
+        </p>
+        <h1 className="text-3xl font-bold">Checkout</h1>
+      </div>
+      <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 sm:p-8">
+        <h2 className="mb-5 text-lg font-bold">1. Delivery address</h2>
+        {step === 1 ? (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setStep(2);
+            }}
+          >
+            <Input
+              label="Street address"
+              autoComplete="street-address"
+              name="street"
+              required
+              maxLength={255}
+              value={address.street}
+              onChange={(event) =>
+                setAddress({ ...address, street: event.target.value })
+              }
+            />
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <Input
+                label="City"
+                autoComplete="address-level2"
+                name="city"
+                required
+                maxLength={100}
+                value={address.city}
+                onChange={(event) =>
+                  setAddress({ ...address, city: event.target.value })
+                }
+              />
+              <Input
+                label="State"
+                autoComplete="address-level1"
+                name="state"
+                required
+                maxLength={100}
+                value={address.state}
+                onChange={(event) =>
+                  setAddress({ ...address, state: event.target.value })
+                }
+              />
             </div>
-            
-            <div className="pt-6 border-t border-gray-100 dark:border-gray-800/50 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[var(--text-secondary)] font-medium">Amount to Pay</p>
-                <p className="text-3xl font-black text-[var(--text-primary)] mt-1">{formatPrice(total + 5)}</p>
-              </div>
-              <button onClick={handlePlaceOrder} disabled={isProcessing} className="px-8 py-4 rounded-2xl text-lg font-bold bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#F97316] text-white shadow-lg shadow-[#EC4899]/20 hover:opacity-90 transition-opacity disabled:opacity-50">
-                {isProcessing ? 'Processing...' : 'Place Order'}
-              </button>
-            </div>
+            <Input
+              label="PIN code"
+              autoComplete="postal-code"
+              name="zip"
+              inputMode="numeric"
+              pattern="[1-9][0-9]{5}"
+              title="Enter a valid six-digit Indian PIN code"
+              required
+              maxLength={6}
+              value={address.zip}
+              onChange={(event) =>
+                setAddress({ ...address, zip: event.target.value })
+              }
+            />
+            <Button type="submit">Continue to payment</Button>
+          </form>
+        ) : (
+          <div className="flex items-start justify-between gap-4 rounded-xl bg-[var(--bg-surface)] p-4">
+            <p className="content-wrap min-w-0 text-sm">
+              {[address.street, address.city, address.state, address.zip].join(
+                ", ",
+              )}
+            </p>
+            <button
+              className="min-h-11 shrink-0 font-semibold text-[#6366F1] dark:text-[#C4B5FD]"
+              disabled={isProcessing}
+              onClick={() => setStep(1)}
+            >
+              Edit
+            </button>
           </div>
         )}
-      </div>
+      </section>
+      {step === 2 && (
+        <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 sm:p-8">
+          <h2 className="mb-5 text-lg font-bold">2. Payment & review</h2>
+          <p className="rounded-xl bg-[var(--bg-surface)] p-4 text-sm">
+            <strong>Pay on delivery</strong>
+            <br />
+            Pay for your groceries when they arrive.
+          </p>
+          <label className="my-5 flex min-h-12 items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0"
+              checked={applyWallet}
+              disabled={isProcessing || balance <= 0}
+              onChange={(event) => setApplyWallet(event.target.checked)}
+            />
+            <span className="text-sm">
+              Use wallet credit · {formatPrice(balance)} available
+              <span className="mt-1 block text-xs text-[var(--text-secondary)]">
+                Wallet credit covers up to 50% of the item total.
+              </span>
+            </span>
+          </label>
+          <dl className="space-y-3 border-t border-[var(--border-default)] pt-5 text-sm">
+            <div className="flex flex-wrap justify-between gap-2">
+              <dt>Item total</dt>
+              <dd className="money">{formatPrice(total)}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt>Delivery</dt>
+              <dd>Free</dd>
+            </div>
+            {walletCredit > 0 && (
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt>Wallet credit</dt>
+                <dd className="money">−{formatPrice(walletCredit)}</dd>
+              </div>
+            )}
+            <div className="flex flex-wrap justify-between gap-2 text-xl font-bold">
+              <dt>Pay on delivery</dt>
+              <dd className="money">{formatPrice(total - walletCredit)}</dd>
+            </div>
+          </dl>
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+            >
+              {error}
+            </p>
+          )}
+          <Button
+            onClick={handlePlaceOrder}
+            disabled={isProcessing || pendingItems.length > 0}
+            aria-busy={isProcessing}
+            className="mt-6 w-full"
+          >
+            {isProcessing ? "Placing your order…" : "Place order"}
+          </Button>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,34 +1,77 @@
 const CATEGORY_STYLES = [
-  { test: /milk|dahi|curd|cheese|butter|egg|dairy/i, label: 'Dairy', color: '#6366F1', accent: '#EEF2FF' },
-  { test: /banana|apple|mango|grape|fruit/i, label: 'Fruit', color: '#22C55E', accent: '#ECFDF5' },
-  { test: /onion|tomato|potato|chilli|coriander|vegetable|paneer/i, label: 'Fresh', color: '#16A34A', accent: '#F0FDF4' },
-  { test: /chips|kurkure|biscuit|cookie|bhujia|chocolate|noodle|snack/i, label: 'Snack', color: '#F97316', accent: '#FFF7ED' },
-  { test: /juice|drink|tea|coffee|water|cola|pepsi|beverage/i, label: 'Drink', color: '#3B82F6', accent: '#EFF6FF' },
-  { test: /atta|rice|dal|oil|salt|sugar|staple/i, label: 'Staple', color: '#A16207', accent: '#FEFCE8' },
-  { test: /soap|shampoo|toothpaste|lotion|care/i, label: 'Care', color: '#EC4899', accent: '#FDF2F8' },
+  {
+    test: /milk|dahi|curd|cheese|butter|egg|dairy/i,
+    label: "Dairy",
+    color: "#6366F1",
+    accent: "#EEF2FF",
+  },
+  {
+    test: /banana|apple|mango|grape|fruit/i,
+    label: "Fruit",
+    color: "#22C55E",
+    accent: "#ECFDF5",
+  },
+  {
+    test: /onion|tomato|potato|chilli|coriander|vegetable|paneer/i,
+    label: "Fresh",
+    color: "#16A34A",
+    accent: "#F0FDF4",
+  },
+  {
+    test: /chips|kurkure|biscuit|cookie|bhujia|chocolate|noodle|snack/i,
+    label: "Snack",
+    color: "#F97316",
+    accent: "#FFF7ED",
+  },
+  {
+    test: /juice|drink|tea|coffee|water|cola|pepsi|beverage/i,
+    label: "Drink",
+    color: "#3B82F6",
+    accent: "#EFF6FF",
+  },
+  {
+    test: /atta|rice|dal|oil|salt|sugar|staple/i,
+    label: "Staple",
+    color: "#A16207",
+    accent: "#FEFCE8",
+  },
+  {
+    test: /soap|shampoo|toothpaste|lotion|care/i,
+    label: "Care",
+    color: "#EC4899",
+    accent: "#FDF2F8",
+  },
 ];
 
-const escapeSvg = (value) => String(value || '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;');
+const escapeSvg = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 export const getProductImage = (product = {}) => {
-  if (product.imageUrl) return product.imageUrl;
+  if (product.imageUrl || product.image_url)
+    return product.imageUrl || product.image_url;
 
-  const text = `${product.name || ''} ${product.category || ''}`;
-  const style = CATEGORY_STYLES.find(item => item.test.test(text)) || {
-    label: 'Fresh',
-    color: '#8B5CF6',
-    accent: '#F7F8FA',
+  const text = `${product.name || ""} ${product.category || ""}`;
+  const style = CATEGORY_STYLES.find((item) => item.test.test(text)) || {
+    label: "Fresh",
+    color: "#8B5CF6",
+    accent: "#F7F8FA",
   };
-  const initials = (product.name || 'Freshcart')
+  const initials = (product.name || "Freshcart")
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map(part => part[0]?.toUpperCase())
-    .join('');
+    .map((part) =>
+      [
+        ...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
+          part,
+        ),
+      ][0]?.segment.toUpperCase(),
+    )
+    .join("");
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">

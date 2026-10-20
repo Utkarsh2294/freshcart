@@ -45,6 +45,9 @@ export default function App() {
 
   useEffect(() => {
     document.body.classList.toggle("dark", isDarkMode);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", isDarkMode ? "#08090C" : "#FFFFFF");
   }, [isDarkMode]);
 
   if (sessionStatus === "loading") {
