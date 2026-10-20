@@ -25,6 +25,9 @@ const WalletCredit = lazy(() => import("../pages/admin/WalletCredit"));
 const NotificationPreferences = lazy(
   () => import("../pages/NotificationPreferences"),
 );
+const UiStress = import.meta.env.DEV
+  ? lazy(() => import("../dev/UiStress"))
+  : null;
 
 const page = (Component) => (
   <Suspense
@@ -40,6 +43,9 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: page(Home) },
+      ...(import.meta.env.DEV
+        ? [{ path: "__ui-stress", element: page(UiStress) }]
+        : []),
       { path: "search", element: page(SearchCategory) },
       { path: "product/:id", element: page(ProductDetail) },
       { path: "cook-this", element: page(CookThis) },
@@ -52,6 +58,17 @@ export const router = createBrowserRouter([
       {
         path: "notifications",
         element: page(NotificationPreferences),
+      },
+      {
+        path: "*",
+        element: (
+          <div className="space-y-4 p-6">
+            <h1 className="text-2xl font-bold">Page not found</h1>
+            <a href="/" className="inline-block min-h-11 underline">
+              Back to Freshcart
+            </a>
+          </div>
+        ),
       },
     ],
   },

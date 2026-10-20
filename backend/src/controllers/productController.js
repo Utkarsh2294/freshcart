@@ -1,4 +1,4 @@
-import { pool } from '../config/database.js';
+import { pool } from "../config/database.js";
 
 const productSelect = `
   SELECT
@@ -98,27 +98,38 @@ export const list = async (req, res, next) => {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
     `;
-    const whereSql = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
+    const whereSql = whereClauses.length
+      ? ` WHERE ${whereClauses.join(" AND ")}`
+      : "";
 
-    let orderSql = ' ORDER BY p.id DESC';
-    if (search) {
-      orderSql = ' ORDER BY intent_rank DESC, rank DESC, sml DESC, p.name ASC';
-    } else if (sort === 'deals') {
-      orderSql = ' ORDER BY (COALESCE(p.mrp, p.price) - p.price) DESC, p.name ASC';
-    } else if (sort === 'price_asc') {
-      orderSql = ' ORDER BY p.price ASC, p.name ASC';
-    } else if (sort === 'price_desc') {
-      orderSql = ' ORDER BY p.price DESC, p.name ASC';
-    } else if (sort === 'newest') {
-      orderSql = ' ORDER BY p.id DESC';
+    let orderSql = " ORDER BY p.id DESC";
+    if (sort === "deals") {
+      orderSql =
+        " ORDER BY (COALESCE(p.mrp, p.price) - p.price) DESC, p.name ASC";
+    } else if (sort === "price_asc") {
+      orderSql = " ORDER BY p.price ASC, p.name ASC";
+    } else if (sort === "price_desc") {
+      orderSql = " ORDER BY p.price DESC, p.name ASC";
+    } else if (sort === "newest") {
+      orderSql = " ORDER BY p.id DESC";
+    } else if (search) {
+      orderSql = " ORDER BY intent_rank DESC, rank DESC, sml DESC, p.name ASC";
     } else {
-      orderSql = ' ORDER BY p.stock_qty DESC, p.name ASC';
+      orderSql = " ORDER BY p.stock_qty DESC, p.name ASC";
     }
 
-    const paginationSql = pageSize ? ` LIMIT $${valIndex} OFFSET $${valIndex + 1}` : '';
+    const paginationSql = pageSize
+      ? ` LIMIT $${valIndex} OFFSET $${valIndex + 1}`
+      : "";
     const itemsSql = `${selectSql}${fromSql}${whereSql}${orderSql}${paginationSql}`;
-    const result = await pool.query(itemsSql, pageSize ? [...values, pageSize, offset] : values);
-    const countResult = await pool.query(`SELECT COUNT(p.id) AS total ${fromSql}${whereSql}`, values);
+    const result = await pool.query(
+      itemsSql,
+      pageSize ? [...values, pageSize, offset] : values,
+    );
+    const countResult = await pool.query(
+      `SELECT COUNT(p.id) AS total ${fromSql}${whereSql}`,
+      values,
+    );
     const total = Number(countResult.rows[0]?.total || 0);
 
     res.json({
@@ -152,7 +163,7 @@ export const getById = async (req, res, next) => {
     const result = await pool.query(query, [id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: "Product not found" });
     }
 
     res.json(result.rows[0]);
@@ -164,10 +175,13 @@ export const getById = async (req, res, next) => {
 export const alsoBought = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const productResult = await pool.query('SELECT category_id FROM products WHERE id = $1', [id]);
+    const productResult = await pool.query(
+      "SELECT category_id FROM products WHERE id = $1",
+      [id],
+    );
 
     if (productResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: "Product not found" });
     }
 
     const categoryId = productResult.rows[0].category_id;

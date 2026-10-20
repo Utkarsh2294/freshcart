@@ -34,8 +34,8 @@ export default function Header({ onMenuClick, sidebarOpen }) {
 
   return (
     <header className="app-header fixed inset-x-0 top-0 z-50 border-b border-[var(--border-default)] bg-[var(--bg-nav)] backdrop-blur-xl">
-      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-3 px-4 lg:px-8">
-        <div className="flex shrink-0 items-center gap-2">
+      <div className="mx-auto flex h-full w-full max-w-[1600px] flex-wrap items-center justify-between gap-[8px] px-[12px] py-2 sm:flex-nowrap sm:py-0 lg:px-8">
+        <div className="flex shrink-0 items-center gap-[4px]">
           <button
             onClick={onMenuClick}
             aria-label="Open navigation"
@@ -46,13 +46,13 @@ export default function Header({ onMenuClick, sidebarOpen }) {
           </button>
           <Link
             to="/"
-            className="hidden text-xl font-bold tracking-normal text-[var(--text-primary)] lg:block"
+            className="text-[20px] font-bold tracking-normal text-[var(--text-primary)]"
           >
             Freshcart
           </Link>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-4 sm:px-4">
+        <div className="order-last flex min-w-0 w-full flex-none items-center justify-center gap-4 sm:order-none sm:w-auto sm:flex-1 sm:px-4">
           <SearchBar />
 
           <Link

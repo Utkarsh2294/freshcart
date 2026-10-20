@@ -1,7 +1,17 @@
-import { useState } from 'react';
-import { ArrowRight, CloudRain, Loader2, Plus, RefreshCw, Sparkles, Sun, X } from 'lucide-react';
-import { getProductImage } from '../../utils/productImages';
-import { formatPrice } from '../../utils/formatters';
+import { useState } from "react";
+import {
+  ArrowRight,
+  CloudRain,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Sun,
+  X,
+} from "lucide-react";
+import { getProductImage } from "../../utils/productImages";
+import { formatPrice } from "../../utils/formatters";
+import Dialog from "./Dialog";
 
 /**
  * Eyebrow suffix and accent icon per signal_type (§5).
@@ -9,12 +19,12 @@ import { formatPrice } from '../../utils/formatters';
  * Streak: no countdown timers, no loss-framing, no red/warning colors (§9 constraint 7).
  */
 const SIGNAL_VARIANTS = {
-  temporal:      { suffix: '', AccentIcon: null },
-  cadence:       { suffix: '', AccentIcon: null },
-  replenishment: { suffix: ' · Running low?', AccentIcon: RefreshCw },
-  weather:       { suffix: ' · Right for today\'s weather', AccentIcon: null }, // icon chosen by reason_tag below
-  event:         { suffix: '', AccentIcon: null }, // suffix chosen by reason_tag below
-  streak:        { suffix: '', AccentIcon: null }, // suffix built dynamically from streak_count
+  temporal: { suffix: "", AccentIcon: null },
+  cadence: { suffix: "", AccentIcon: null },
+  replenishment: { suffix: " · Running low?", AccentIcon: RefreshCw },
+  weather: { suffix: " · Right for today's weather", AccentIcon: null }, // icon chosen by reason_tag below
+  event: { suffix: "", AccentIcon: null }, // suffix chosen by reason_tag below
+  streak: { suffix: "", AccentIcon: null }, // suffix built dynamically from streak_count
 };
 
 /**
@@ -30,22 +40,22 @@ const WEATHER_ICONS = {
  * Event reason_tag → eyebrow suffix mapping (§5).
  */
 const EVENT_SUFFIXES = {
-  matchday_snacks: ' · Game night',
-  festival_essentials: ' · Festival prep',
+  matchday_snacks: " · Game night",
+  festival_essentials: " · Festival prep",
 };
 
 function getEyebrowSuffix(signalType, reasonTag, streakCount) {
-  if (signalType === 'streak' && streakCount) {
+  if (signalType === "streak" && streakCount) {
     return ` · ${streakCount}-week streak`;
   }
-  if (signalType === 'event' && EVENT_SUFFIXES[reasonTag]) {
+  if (signalType === "event" && EVENT_SUFFIXES[reasonTag]) {
     return EVENT_SUFFIXES[reasonTag];
   }
-  return SIGNAL_VARIANTS[signalType]?.suffix || '';
+  return SIGNAL_VARIANTS[signalType]?.suffix || "";
 }
 
 function getAccentIcon(signalType, reasonTag) {
-  if (signalType === 'weather') {
+  if (signalType === "weather") {
     return WEATHER_ICONS[reasonTag] || null;
   }
   return SIGNAL_VARIANTS[signalType]?.AccentIcon || null;
@@ -63,94 +73,127 @@ export default function PramarshaBanner({
   const products = recommendation.products || [];
   if (!products.length) return null;
 
-  const signalType = recommendation.signal_type || 'temporal';
-  const reasonTag = recommendation.reason_tag || 'usual_picks';
+  const signalType = recommendation.signal_type || "temporal";
+  const reasonTag = recommendation.reason_tag || "usual_picks";
   const streakCount = recommendation.streak_count;
   const eyebrowSuffix = getEyebrowSuffix(signalType, reasonTag, streakCount);
   const AccentIcon = getAccentIcon(signalType, reasonTag);
 
   return (
     <>
-    <section
-      role="button"
-      tabIndex={0}
-      onClick={() => setIsExpanded(true)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          setIsExpanded(true);
-        }
-      }}
-      className="cursor-pointer overflow-hidden rounded-2xl border border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E] via-[#14B8A6] to-[#22C55E] p-5 text-white shadow-sm"
-    >
-      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-white/80">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            Pramarsha — Right about now{eyebrowSuffix}
+      <section className="overflow-hidden rounded-2xl border border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E] to-[#166534] p-5 text-white shadow-sm">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-white/80">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              Pramarsha — Right about now{eyebrowSuffix}
+            </div>
+            <div className="flex items-center gap-2">
+              {AccentIcon && (
+                <AccentIcon className="h-5 w-5 flex-shrink-0 text-white/90" />
+              )}
+              <h2 className="text-2xl font-black tracking-normal md:text-3xl">
+                {recommendation.headline}
+              </h2>
+            </div>
+            <p className="mt-2 max-w-xl text-sm text-white/80">
+              Based on your recent Freshcart timing and repeat-order pattern.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              className="mt-3 min-h-11 text-sm font-semibold underline underline-offset-4"
+            >
+              View all {products.length} suggested items
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            {AccentIcon && <AccentIcon className="h-5 w-5 flex-shrink-0 text-white/90" />}
-            <h2 className="text-2xl font-black tracking-normal md:text-3xl">{recommendation.headline}</h2>
-          </div>
-          <p className="mt-2 max-w-xl text-sm text-white/80">
-            Based on your recent Freshcart timing and repeat-order pattern.
-          </p>
-          <p className="mt-3 text-xs font-bold uppercase tracking-normal text-white/70">
-            Tap to view all {products.length} suggested items
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex -space-x-3">
-            {products.slice(0, 3).map(product => (
-              <img
-                key={product.id}
-                src={getProductImage(product)}
-                alt={product.name}
-                className="h-14 w-14 rounded-2xl border-2 border-white/70 bg-white object-contain"
-              />
-            ))}
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-3">
+              {products.slice(0, 3).map((product) => (
+                <img
+                  key={product.id}
+                  src={getProductImage(product)}
+                  alt={product.name}
+                  className="h-14 w-14 rounded-2xl border-2 border-white/70 bg-white object-contain"
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddAll?.();
+              }}
+              disabled={isAdding}
+              className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#0F766E] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
+            >
+              {isAdding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              Add all
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAddAll?.();
-            }}
-            disabled={isAdding}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#0F766E] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-70"
-          >
-            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Add all
-            <ArrowRight className="h-4 w-4" />
-          </button>
         </div>
-      </div>
-    </section>
-    {isExpanded && (
-      <div className="fixed inset-0 z-[70] bg-black/60 p-4 backdrop-blur-sm" onClick={() => setIsExpanded(false)}>
-        <div className="mx-auto mt-8 max-h-[86vh] max-w-5xl overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      </section>
+      <Dialog
+        open={isExpanded}
+        onClose={() => setIsExpanded(false)}
+        labelledBy="recommendation-title"
+      >
+        <div className="p-5">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-normal text-[#14B8A6]">Pramarsha</p>
-              <h3 className="text-xl font-black text-[var(--text-primary)]">{recommendation.headline}</h3>
+              <p className="text-xs font-bold uppercase tracking-normal text-[#14B8A6]">
+                Pramarsha
+              </p>
+              <h3
+                id="recommendation-title"
+                className="content-wrap text-xl font-black text-[var(--text-primary)]"
+              >
+                {recommendation.headline}
+              </h3>
             </div>
-            <button type="button" onClick={() => setIsExpanded(false)} className="rounded-full bg-[var(--bg-surface)] p-2 text-[var(--text-secondary)]">
+            <button
+              type="button"
+              aria-label="Close recommendations"
+              onClick={() => setIsExpanded(false)}
+              className="icon-button bg-[var(--bg-surface)] text-[var(--text-secondary)]"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {products.map(product => (
-              <div key={product.id} className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3">
-                <img src={getProductImage(product)} alt={product.name} className="mb-3 h-24 w-full rounded-lg bg-white object-contain" />
-                <p className="line-clamp-2 min-h-10 text-sm font-bold text-[var(--text-primary)]">{product.name}</p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">{product.brand} · {product.unit}</p>
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3"
+              >
+                <img
+                  src={getProductImage(product)}
+                  alt={product.name}
+                  className="mb-3 h-24 w-full rounded-lg bg-white object-contain"
+                />
+                <p className="line-clamp-2 min-h-10 text-sm font-bold text-[var(--text-primary)]">
+                  {product.name}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {product.brand} · {product.unit}
+                </p>
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="font-black text-[var(--text-primary)]">{formatPrice(product.price)}</span>
-                  <button type="button" onClick={() => onAddProduct?.(product)} className="rounded-lg bg-[#14B8A6] px-3 py-2 text-xs font-bold text-white">
+                  <span className="font-black text-[var(--text-primary)]">
+                    {formatPrice(product.price)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onAddProduct?.(product)}
+                    className="rounded-lg bg-[#14B8A6] px-3 py-2 text-xs font-bold text-white"
+                  >
                     Add
                   </button>
                 </div>
@@ -166,12 +209,15 @@ export default function PramarshaBanner({
             disabled={isAdding}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 py-3 text-sm font-bold text-white disabled:opacity-70"
           >
-            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {isAdding ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
             Add all recommendations
           </button>
         </div>
-      </div>
-    )}
+      </Dialog>
     </>
   );
 }

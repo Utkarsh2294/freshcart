@@ -127,14 +127,14 @@ export default function SearchCategory() {
           <div
             aria-label="Loading products"
             role="status"
-            className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-3"
+            className="product-grid"
           >
             {[...Array(8)].map((_, i) => (
               <SkeletonLoader key={i} />
             ))}
           </div>
         ) : products.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-3">
+          <div className="product-grid">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

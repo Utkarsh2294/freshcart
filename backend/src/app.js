@@ -27,13 +27,23 @@ import homeRoutes from "./routes/home.routes.js";
 import phase8Routes from "./routes/phase8.routes.js";
 
 const app = express();
+if (config.NODE_ENV === "production") app.set("trust proxy", 1);
 
 app.use(
   cors({
     origin: config.CORS_ORIGINS,
   }),
 );
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "wss:"],
+      },
+    },
+  }),
+);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(requestMetrics);
@@ -74,7 +84,20 @@ if (config.NODE_ENV === "production") {
     "dist",
   );
 
-  app.use(express.static(frontendDirectory, { index: false, maxAge: "1y" }));
+  app.use(
+    express.static(frontendDirectory, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        const hashedAsset =
+          dirname(filePath) === join(frontendDirectory, "assets") &&
+          /-[\w-]{8,}\.[\w]+$/.test(filePath);
+        res.set(
+          "Cache-Control",
+          hashedAsset ? "public, max-age=31536000, immutable" : "no-cache",
+        );
+      },
+    }),
+  );
   app.use((req, res, next) => {
     if (
       req.method !== "GET" ||

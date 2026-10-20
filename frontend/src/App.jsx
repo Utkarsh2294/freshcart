@@ -29,7 +29,11 @@ export default function App() {
     }
 
     let guestKey = localStorage.getItem(GUEST_KEY);
-    if (!guestKey) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        guestKey || "",
+      )
+    ) {
       guestKey = crypto.randomUUID();
       localStorage.setItem(GUEST_KEY, guestKey);
     }
@@ -37,7 +41,15 @@ export default function App() {
     createGuestSession(guestKey)
       .then(async (data) => {
         login(data.user, data.accessToken || data.token);
-        await mergeGuestCart();
+        try {
+          await mergeGuestCart();
+        } catch {
+          useUiStore.getState().addToast({
+            type: "error",
+            message:
+              "Some saved items could not be restored. Please check your cart.",
+          });
+        }
         setSessionStatus("ready");
       })
       .catch(() => setSessionStatus("error"));
@@ -52,7 +64,10 @@ export default function App() {
 
   if (sessionStatus === "loading") {
     return (
-      <div className="grid min-h-screen place-items-center bg-[var(--bg-app)] text-[var(--text-secondary)]">
+      <div
+        role="status"
+        className="grid min-h-dvh place-items-center bg-[var(--bg-app)] text-[var(--text-secondary)]"
+      >
         Opening Freshcart...
       </div>
     );
@@ -60,7 +75,10 @@ export default function App() {
 
   if (sessionStatus === "error") {
     return (
-      <div className="grid min-h-screen place-items-center bg-[var(--bg-app)] px-6 text-center text-[var(--text-primary)]">
+      <div
+        role="alert"
+        className="grid min-h-dvh place-items-center bg-[var(--bg-app)] px-6 text-center text-[var(--text-primary)]"
+      >
         <div>
           <p className="mb-4">
             Freshcart could not start your shopping session.

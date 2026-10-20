@@ -1,19 +1,23 @@
-import { create } from 'zustand';
-import * as walletService from '../services/walletService';
+import { create } from "zustand";
+import * as walletService from "../services/walletService";
 
 export const useWalletStore = create((set) => ({
   balance: 0,
   transactions: [],
   referralCode: null,
   isLoading: false,
+  error: "",
 
   fetchWallet: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: "" });
     try {
       const data = await walletService.getWallet();
-      set({ balance: data.balance || 0, transactions: data.transactions || [] });
+      set({
+        balance: Number(data.balance || 0),
+        transactions: data.transactions || [],
+      });
     } catch (err) {
-      console.error(err);
+      set({ error: "Your wallet could not be loaded. Please try again." });
     } finally {
       set({ isLoading: false });
     }
@@ -32,10 +36,13 @@ export const useWalletStore = create((set) => ({
     try {
       await walletService.redeemReferralCode(code);
       const data = await walletService.getWallet();
-      set({ balance: data.balance || 0, transactions: data.transactions || [] });
+      set({
+        balance: data.balance || 0,
+        transactions: data.transactions || [],
+      });
     } catch (err) {
       console.error(err);
       throw err;
     }
-  }
+  },
 }));

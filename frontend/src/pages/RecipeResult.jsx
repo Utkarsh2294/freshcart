@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import * as cookThisService from "../services/cookThisService";
 import { formatPrice } from "../utils/formatters";
-import { getProductImage } from "../utils/productImages";
+import ProductImage from "../components/common/ProductImage";
+import Dialog from "../components/common/Dialog";
 import { useCartStore } from "../store/cartStore";
 import SwapSheet from "../components/common/SwapSheet";
 import { featureFlags } from "../utils/featureFlags";
@@ -66,6 +67,7 @@ export default function RecipeResult() {
     () => localStorage.getItem("freshcart_recipe_language") || "en",
   );
   const wakeLockRef = useRef(null);
+  const addingRef = useRef(false);
 
   useEffect(() => {
     if (!cookingMode) {
@@ -176,6 +178,8 @@ export default function RecipeResult() {
   };
 
   const handleAddToCart = async () => {
+    if (addingRef.current || !selectedMatches.length) return;
+    addingRef.current = true;
     setIsAdding(true);
     setMessage("");
     try {
@@ -188,9 +192,14 @@ export default function RecipeResult() {
       await fetchCart();
       setMessage(`${selectedMatches.length} matched products added to cart.`);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Could not add items to cart.");
+      setMessage(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Could not add items to cart.",
+      );
     } finally {
       setIsAdding(false);
+      addingRef.current = false;
     }
   };
 
@@ -216,7 +225,7 @@ export default function RecipeResult() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl pb-24">
+    <div className="content-wrap mx-auto max-w-5xl pb-12">
       <div className="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-r from-[#111827] to-[#312E81] p-6 shadow-xl md:p-10">
         <div className="mb-4 flex w-max items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-normal text-white">
           <Sparkles className="h-3 w-3" /> AI Generated
@@ -230,13 +239,16 @@ export default function RecipeResult() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="min-w-0 space-y-6 xl:col-span-2">
           <div className="flex items-center gap-4 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-4 shadow-sm">
             <div className="flex flex-1 flex-col items-center justify-center border-r border-[var(--border-default)] p-2">
               <Clock className="mb-1 h-6 w-6 text-[#8B5CF6]" />
               <span className="text-sm font-semibold text-[var(--text-primary)]">
-                30-45 mins
+                {recipe.prep_time_minutes != null ||
+                recipe.cook_time_minutes != null
+                  ? `${Number(recipe.prep_time_minutes || 0) + Number(recipe.cook_time_minutes || 0)} mins`
+                  : "Time varies"}
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-center border-r border-[var(--border-default)] p-2">
@@ -316,7 +328,7 @@ export default function RecipeResult() {
             {(recipe.steps || []).map((step, index) => (
               <div
                 key={`${typeof step === "string" ? step : step.id}-${index}`}
-                className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] transition-all ${
+                className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] ${
                   expandedStep === index
                     ? "border-[#8B5CF6] shadow-md dark:shadow-none"
                     : "border-[var(--border-default)]"
@@ -326,6 +338,8 @@ export default function RecipeResult() {
                   onClick={() =>
                     setExpandedStep(expandedStep === index ? -1 : index)
                   }
+                  aria-expanded={expandedStep === index}
+                  aria-controls={`recipe-step-${index}`}
                   className="flex w-full items-center justify-between p-4 text-left"
                 >
                   <div className="flex items-center gap-4">
@@ -347,7 +361,10 @@ export default function RecipeResult() {
                   />
                 </button>
                 {expandedStep === index && (
-                  <div className="px-4 pb-4 pl-16 text-[var(--text-secondary)]">
+                  <div
+                    id={`recipe-step-${index}`}
+                    className="px-4 pb-4 sm:pl-16 text-[var(--text-secondary)]"
+                  >
                     {displayStep(step)}
                   </div>
                 )}
@@ -356,7 +373,7 @@ export default function RecipeResult() {
           </div>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <div className="sticky top-24 rounded-3xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-sm">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-normal text-[var(--text-primary)]">
@@ -374,13 +391,16 @@ export default function RecipeResult() {
 
                 return (
                   <div
-                    key={`${match.ingredient.name}-${product?.id || "none"}`}
+                    key={`${match.ingredient?.name}-${product?.id || "none"}-${index}`}
                     className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3"
                   >
                     <div className="mb-3 flex items-start gap-3">
                       <button
                         onClick={() => product && toggleMatch(product.id)}
                         disabled={!product}
+                        role="checkbox"
+                        aria-checked={Boolean(isSelected)}
+                        aria-label={`Include ${match.ingredient?.name || "ingredient"}`}
                         className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${
                           isSelected
                             ? "border-[#EC4899] bg-[#EC4899]"
@@ -391,11 +411,11 @@ export default function RecipeResult() {
                       </button>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-[var(--text-primary)]">
-                          {match.ingredient.name}
+                          {match.ingredient?.name || "Ingredient"}
                         </p>
                         <p className="text-xs text-[var(--text-secondary)]">
-                          Needs {match.ingredient.qty}
-                          {match.ingredient.unit
+                          Needs {match.ingredient?.qty}
+                          {match.ingredient?.unit
                             ? ` ${match.ingredient.unit}`
                             : ""}
                         </p>
@@ -403,16 +423,18 @@ export default function RecipeResult() {
                       <span
                         className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${badgeStyles[match.match_type] || badgeStyles.closest}`}
                       >
-                        {match.match_type.replace("_", " ")}
+                        {String(match.match_type || "closest").replaceAll(
+                          "_",
+                          " ",
+                        )}
                       </span>
                     </div>
 
                     {product ? (
                       <div className="flex gap-3">
-                        <img
-                          src={getProductImage(product)}
-                          alt={product.name}
-                          className="h-14 w-14 rounded-xl object-contain"
+                        <ProductImage
+                          product={product}
+                          className="h-14 w-14 shrink-0 rounded-xl object-contain"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="line-clamp-2 text-sm font-bold text-[var(--text-primary)]">
@@ -461,7 +483,10 @@ export default function RecipeResult() {
             </button>
 
             {message && (
-              <p className="mt-3 text-center text-sm font-medium text-[var(--text-secondary)]">
+              <p
+                role="status"
+                className="mt-3 text-center text-sm font-medium text-[var(--text-secondary)]"
+              >
                 {message}
               </p>
             )}
@@ -486,22 +511,24 @@ export default function RecipeResult() {
         onSelect={applyRecipeSwap}
       />
 
-      {cookingMode && featureFlags.handsFreeCooking && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-[#0F172A] p-6 text-white"
-          onClick={() =>
-            setCookingStep((step) =>
-              Math.min((recipe.steps?.length || 1) - 1, step + 1),
-            )
-          }
+      {featureFlags.handsFreeCooking && (
+        <Dialog
+          open={cookingMode}
+          onClose={() => setCookingMode(false)}
+          labelledBy="cooking-title"
+          className="cooking-dialog"
         >
           <div className="mb-8 flex items-center justify-between">
-            <span className="text-sm font-bold uppercase tracking-normal text-white/60">
+            <h2
+              id="cooking-title"
+              className="text-sm font-bold uppercase tracking-normal text-white/60"
+            >
               Step {cookingStep + 1} of {recipe.steps?.length || 1}
-            </span>
+            </h2>
             <div className="flex gap-2">
               <button
                 type="button"
+                aria-label="Read this step aloud"
                 onClick={(event) => {
                   event.stopPropagation();
                   readStep();
@@ -512,6 +539,7 @@ export default function RecipeResult() {
               </button>
               <button
                 type="button"
+                aria-label="Close cooking mode"
                 onClick={(event) => {
                   event.stopPropagation();
                   setCookingMode(false);
@@ -522,14 +550,15 @@ export default function RecipeResult() {
               </button>
             </div>
           </div>
-          <div className="flex flex-1 items-center justify-center text-center">
-            <p className="max-w-4xl text-4xl font-black leading-tight tracking-normal md:text-6xl">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-6 text-center">
+            <p className="mx-auto max-w-4xl text-2xl font-bold leading-relaxed tracking-normal md:text-4xl">
               {displayStep(recipe.steps?.[cookingStep])}
             </p>
           </div>
           <div className="flex items-center justify-between">
             <button
               type="button"
+              disabled={cookingStep === 0}
               onClick={(event) => {
                 event.stopPropagation();
                 setCookingStep((step) => Math.max(0, step - 1));
@@ -540,6 +569,7 @@ export default function RecipeResult() {
             </button>
             <button
               type="button"
+              disabled={cookingStep >= (recipe.steps?.length || 1) - 1}
               onClick={(event) => {
                 event.stopPropagation();
                 setCookingStep((step) =>
@@ -551,7 +581,7 @@ export default function RecipeResult() {
               Next
             </button>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
-import { io } from 'socket.io-client';
-import { SOCKET_URL } from '../utils/constants';
+import { io } from "socket.io-client";
+import { SOCKET_URL } from "../utils/constants";
 
 let socket = null;
 
@@ -24,15 +24,21 @@ export const disconnect = () => {
 };
 
 export const joinOrderRoom = (orderId) => {
-  if (socket && socket.connected) {
-    socket.emit('join_order', orderId);
-  }
+  if (!socket) return () => {};
+  const connection = socket;
+  const join = () => connection.emit("join_order", orderId);
+  connection.on("connect", join);
+  if (connection.connected) join();
+  return () => {
+    connection.off("connect", join);
+    connection.emit("leave_order", orderId);
+  };
 };
 
 export const onTrackingUpdate = (callback) => {
   if (socket) {
-    socket.on('tracking_update', callback);
-    return () => socket.off('tracking_update', callback);
+    socket.on("tracking_update", callback);
+    return () => socket.off("tracking_update", callback);
   }
   return () => {};
 };

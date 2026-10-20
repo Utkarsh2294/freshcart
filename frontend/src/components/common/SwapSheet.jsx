@@ -3,6 +3,7 @@ import { formatPrice } from "../../utils/formatters";
 import ProductImage from "./ProductImage";
 import Dialog from "./Dialog";
 import Rating from "./Rating";
+import { useId } from "react";
 
 function DeltaBadge({ value }) {
   const amount = Number(value || 0);
@@ -36,11 +37,12 @@ export default function SwapSheet({
   onClose,
   onSelect,
 }) {
+  const titleId = useId();
   return (
     <Dialog
       open={isOpen}
       onClose={onClose}
-      labelledBy="swap-title"
+      labelledBy={titleId}
       className="dialog-sheet"
     >
       <header className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
@@ -49,7 +51,7 @@ export default function SwapSheet({
             Brand Swap
           </p>
           <h2
-            id="swap-title"
+            id={titleId}
             className="text-lg font-bold text-[var(--text-primary)]"
           >
             Choose an alternative

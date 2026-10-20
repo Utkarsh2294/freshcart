@@ -1,7 +1,15 @@
 import { create } from "zustand";
 
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("freshcart_user")) || null;
+  } catch {
+    return null;
+  }
+}
+
 export const useAuthStore = create((set) => ({
-  user: JSON.parse(localStorage.getItem("freshcart_user")) || null,
+  user: readStoredUser(),
   token: localStorage.getItem("freshcart_token") || null,
   isAuthenticated: !!localStorage.getItem("freshcart_token"),
 
