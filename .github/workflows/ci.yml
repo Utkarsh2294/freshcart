@@ -25,19 +25,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgresql://freshcart:freshcart_pass@localhost:5432/freshcart
-      REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-test-secret
       JWT_REFRESH_SECRET: ci-test-refresh-secret
       NODE_ENV: test
@@ -89,6 +78,9 @@ jobs:
       - name: Verify PWA cache busting
         run: npm run check:pwa
 
+      - name: Verify production serving
+        run: npm run check:production
+
       - name: Check formatting of changed files
         env:
           FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -105,3 +97,21 @@ jobs:
         run: |
           python ai-services/input-understanding-service/test_nlu.py
           python ai-services/recommendation-service/test_scoring.py
+
+      - name: Build production container
+        run: docker build -f backend/Dockerfile -t freshcart:ci .
+
+      - name: Verify container startup
+        run: |
+          docker run --rm --name freshcart-ci --network host -e DATABASE_URL -e JWT_SECRET -e JWT_REFRESH_SECRET -e NODE_ENV=production -e PORT=4000 -d freshcart:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:4000/api/health; then
+              curl --fail --silent http://localhost:4000/ | rg '<title>Freshcart</title>'
+              docker stop freshcart-ci
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs freshcart-ci
+          docker stop freshcart-ci
+          exit 1

@@ -231,7 +231,7 @@ Set the server flag as `FEATURE_<SUFFIX>` and the matching Vite build flag as `V
 
 | Layer                     | Technology                                                                                                                                    |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Frontend**              | React 18, Vite, Tailwind CSS (built directly against the locked design-token file), Zustand / Redux Toolkit, PropTypes                        |
+| **Frontend**              | React 19, Vite, Tailwind CSS, Zustand, PropTypes                                                                                              |
 | **Backend API**           | Node.js, Express (ESM), Socket.IO for live tracking and notifications                                                                         |
 | **Primary Database**      | PostgreSQL 16 with trigram search indexing                                                                                                    |
 | **Intelligence Services** | A dedicated microservice layer handling intent understanding, ingredient grounding, recipe generation, and trust-based recommendation scoring |

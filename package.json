@@ -20,6 +20,7 @@
     "format:check": "node scripts/checkChangedFormatting.js",
     "check:contracts": "node scripts/checkContracts.js",
     "check:pwa": "node scripts/checkPwaBuild.js",
+    "check:production": "node scripts/checkProductionBuild.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "jobs:pramarsha": "node scripts/jobs/computeCadenceAndStreaks.js",

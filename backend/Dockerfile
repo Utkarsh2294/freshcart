@@ -9,6 +9,8 @@ RUN npm ci --workspace=frontend --workspace=shared --include-workspace-root
 COPY design/ design/
 COPY shared/ shared/
 COPY frontend/ frontend/
+ARG VITE_VAPID_PUBLIC_KEY=
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 RUN npm run build --workspace=frontend
 
 FROM node:22-alpine

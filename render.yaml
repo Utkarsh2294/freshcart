@@ -32,12 +32,12 @@ services:
         fromService:
           type: web
           name: freshcart-recommendation
-          property: hostport
+          envVarKey: RENDER_EXTERNAL_URL
       - key: INPUT_UNDERSTANDING_SERVICE_URL
         fromService:
           type: web
           name: freshcart-input-understanding
-          property: hostport
+          envVarKey: RENDER_EXTERNAL_URL
 
   - type: web
     name: freshcart-recommendation
