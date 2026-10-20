@@ -201,6 +201,147 @@
       max(1.5rem, env(safe-area-inset-bottom, 0px))
       max(1.5rem, env(safe-area-inset-left, 0px));
   }
+  .dialog-surface {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    transition:
+      opacity 200ms var(--ease-smooth),
+      transform 200ms var(--ease-smooth),
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+  .dialog-surface[open] {
+    opacity: 1;
+    transform: none;
+  }
+  .dialog-surface::backdrop {
+    opacity: 0;
+    transition:
+      opacity 200ms var(--ease-smooth),
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+  .dialog-surface[open]::backdrop {
+    opacity: 1;
+  }
+  .dialog-menu {
+    transform: translateX(-100%);
+    transition-duration: 250ms;
+    transition-timing-function: var(--ease-drawer);
+  }
+  .account-popover {
+    transform-origin: top right;
+    transition:
+      opacity 160ms var(--ease-smooth),
+      transform 160ms var(--ease-smooth);
+  }
+  .toast-stack {
+    bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  }
+  .toast-item,
+  .notification-prompt {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 200ms var(--ease-smooth),
+      transform 200ms var(--ease-smooth);
+  }
+  .toast-item[data-closing="true"] {
+    opacity: 0;
+    transform: translateY(8px);
+    transition-duration: 160ms;
+  }
+  .switch-thumb {
+    transition: transform 160ms var(--ease-smooth);
+  }
+  .press-feedback,
+  .icon-button {
+    transition:
+      transform 0ms var(--ease-smooth),
+      opacity 100ms var(--ease-smooth);
+  }
+  :root[data-input-mode="pointer"] .press-feedback:active:not(:disabled),
+  :root[data-input-mode="pointer"] .icon-button:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 100ms;
+  }
+  .voice-button,
+  .notification-prompt {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  @starting-style {
+    .dialog-surface[open] {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    .dialog-menu[open] {
+      transform: translateX(-100%);
+    }
+    .dialog-surface[open]::backdrop {
+      opacity: 0;
+    }
+    .account-popover {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    .toast-item,
+    .notification-prompt {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  :root[data-input-mode="keyboard"]
+    :is(
+      .dialog-surface,
+      .account-popover,
+      .press-feedback,
+      .icon-button,
+      .switch-thumb,
+      .toast-item
+    ) {
+    transition-duration: 0s;
+  }
+  :root[data-input-mode="keyboard"] .dialog-surface::backdrop {
+    transition-duration: 0s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+    }
+    .dialog-surface,
+    .dialog-menu,
+    .account-popover,
+    .toast-item,
+    .notification-prompt {
+      transform: none !important;
+      transition-property: opacity, display, overlay;
+      transition-duration: 160ms;
+    }
+    .press-feedback,
+    .icon-button,
+    .switch-thumb {
+      transition: none;
+    }
+    :root[data-input-mode="pointer"] .press-feedback:active:not(:disabled),
+    :root[data-input-mode="pointer"] .icon-button:active:not(:disabled) {
+      transform: none;
+    }
+    .animate-spin,
+    .animate-pulse {
+      animation: none;
+    }
+    @starting-style {
+      .dialog-surface[open],
+      .dialog-menu[open],
+      .account-popover,
+      .toast-item,
+      .notification-prompt {
+        transform: none;
+      }
+    }
+  }
   @media (min-width: 768px) {
     .dialog-sheet {
       margin: auto;
@@ -211,6 +352,13 @@
   @media (min-width: 1024px) {
     .app-layout {
       padding-bottom: 0;
+    }
+    .voice-button,
+    .notification-prompt {
+      bottom: 1.5rem;
+    }
+    .toast-stack {
+      bottom: 6rem;
     }
   }
 }

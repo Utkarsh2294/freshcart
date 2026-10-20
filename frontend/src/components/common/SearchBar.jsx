@@ -153,7 +153,7 @@ export default function SearchBar() {
             }
           }}
           onFocus={() => setIsOpen(true)}
-          className="block w-full rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] py-3 pl-12 pr-12 text-sm text-[var(--text-primary)] shadow-sm transition-shadow placeholder:text-[var(--text-secondary)] focus:border-[#6366F1] focus:outline-none focus:ring-2 focus:ring-[#6366F1]/20"
+          className="block w-full rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] py-3 pl-12 pr-12 text-sm text-[var(--text-primary)] shadow-sm placeholder:text-[var(--text-secondary)] focus:border-[#6366F1] focus:outline-none focus:ring-2 focus:ring-[#6366F1]/20"
           placeholder={'Search for "milk", "bread" or "apple"'}
         />
         <button

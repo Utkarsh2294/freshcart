@@ -20,6 +20,21 @@ export default function App() {
   useSocket();
 
   useEffect(() => {
+    const keyboard = () => {
+      document.documentElement.dataset.inputMode = "keyboard";
+    };
+    const pointer = () => {
+      document.documentElement.dataset.inputMode = "pointer";
+    };
+    document.addEventListener("keydown", keyboard, true);
+    document.addEventListener("pointerdown", pointer, true);
+    return () => {
+      document.removeEventListener("keydown", keyboard, true);
+      document.removeEventListener("pointerdown", pointer, true);
+    };
+  }, []);
+
+  useEffect(() => {
     if (sessionStarted.current) return;
     sessionStarted.current = true;
 

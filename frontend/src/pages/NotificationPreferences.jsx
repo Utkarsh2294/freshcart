@@ -141,7 +141,12 @@ export default function NotificationPreferences() {
                   className={`flex h-8 w-14 items-center rounded-full p-1 ${prefs[key] ? "bg-[#6366F1]" : "bg-gray-300 dark:bg-gray-600"}`}
                 >
                   <span
-                    className={`switch-thumb h-6 w-6 rounded-full bg-white shadow-sm ${prefs[key] ? "translate-x-6" : "translate-x-0"}`}
+                    className="switch-thumb h-6 w-6 rounded-full bg-white shadow-sm"
+                    style={{
+                      transform: prefs[key]
+                        ? "translateX(24px)"
+                        : "translateX(0)",
+                    }}
                   />
                 </span>
               </button>

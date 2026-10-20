@@ -357,7 +357,7 @@ export default function RecipeResult() {
                     </span>
                   </div>
                   <ChevronDown
-                    className={`h-5 w-5 text-[var(--text-secondary)] transition-transform ${expandedStep === index ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 text-[var(--text-secondary)] ${expandedStep === index ? "rotate-180" : ""}`}
                   />
                 </button>
                 {expandedStep === index && (
