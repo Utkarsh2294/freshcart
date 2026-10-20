@@ -20,7 +20,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U freshcart -d freshcart"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -106,14 +106,13 @@ jobs:
       - name: Verify container startup
         run: |
           docker run --rm --name freshcart-ci --network host -e DATABASE_URL -e JWT_SECRET -e JWT_REFRESH_SECRET -e NODE_ENV=production -e PORT=4000 -d freshcart:ci
+          trap 'docker stop freshcart-ci >/dev/null 2>&1 || true' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://localhost:4000/api/health; then
-              curl --fail --silent http://localhost:4000/ | rg '<title>Freshcart</title>'
-              docker stop freshcart-ci
+              curl --fail --silent http://localhost:4000/ | grep -F '<title>Freshcart</title>'
               exit 0
             fi
             sleep 2
           done
           docker logs freshcart-ci
-          docker stop freshcart-ci
           exit 1
